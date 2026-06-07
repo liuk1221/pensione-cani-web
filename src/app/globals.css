@@ -12,15 +12,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  min-height: 100%;
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #f8fafc 40%,
+    #eff6ff 100%
+  );
+
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
