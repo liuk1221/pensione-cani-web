@@ -8,7 +8,8 @@ export type DayAvailabilityStatus =
   | "limited"
   | "full"
   | "closed"
-  | "unknown";
+  | "unknown"
+  | "past";
 
 export type DayAvailability = {
   date: string;
@@ -29,6 +30,7 @@ type AvailabilityCalendarProps = {
   selectedEndDate?: string | null;
   onDayClick?: (date: string) => void;
   isDayDisabled?: (date: string, availability?: DayAvailability) => boolean;
+  disablePastDates?: boolean;
 };
 
 const monthNames = [
@@ -78,8 +80,10 @@ function getStatusLabel(status: DayAvailabilityStatus) {
       return "Completo";
     case "closed":
       return "Chiuso";
+    case "past":
+      return "Passato";
     default:
-      return "Da verificare";
+      return "No Info";
   }
 }
 
@@ -88,6 +92,10 @@ function getDayClasses(
   selectionState: SelectionState,
   disabled: boolean,
 ) {
+  if (status === "past") {
+    return "border-slate-200 bg-slate-100 text-slate-400 opacity-70";
+  }
+
   if (selectionState === "start" || selectionState === "end") {
     return "border-blue-950 bg-blue-950 text-white ring-4 ring-yellow-300";
   }
@@ -125,8 +133,10 @@ export function AvailabilityCalendar({
   selectedEndDate = null,
   onDayClick,
   isDayDisabled,
+  disablePastDates = mode !== "admin",
 }: AvailabilityCalendarProps) {
   const today = new Date();
+  const todayKey = toDateKey(today);
 
   const [visibleMonth, setVisibleMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1),
@@ -212,14 +222,21 @@ export function AvailabilityCalendar({
             return <div key={`empty-${index}`} />;
           }
 
-          const dateKey = toDateKey(date);
-          const availability = availabilityByDate[dateKey];
+            const dateKey = toDateKey(date);
+            const availability = availabilityByDate[dateKey];
 
-          const status = availability?.status ?? "unknown";
-          const selectionState = getSelectionState(dateKey);
-          const disabledByRule = isDayDisabled?.(dateKey, availability) ?? false;
+            const isPastDate = disablePastDates && dateKey < todayKey;
 
-          const isClickable = Boolean(onDayClick) && !disabledByRule;
+            const status: DayAvailabilityStatus = isPastDate
+            ? "past"
+            : availability?.status ?? "unknown";
+
+            const selectionState = isPastDate ? "none" : getSelectionState(dateKey);
+
+            const disabledByRule = isDayDisabled?.(dateKey, availability) ?? false;
+            const disabled = isPastDate || disabledByRule;
+
+            const isClickable = Boolean(onDayClick) && !disabled;
 
           return (
             <button
@@ -228,9 +245,9 @@ export function AvailabilityCalendar({
               disabled={!isClickable}
               onClick={() => onDayClick?.(dateKey)}
               className={`min-h-20 rounded-2xl border p-2 text-left transition sm:min-h-24 ${getDayClasses(
-                status,
-                selectionState,
-                disabledByRule,
+              status,
+              selectionState,
+              disabled,
               )} ${isClickable ? "cursor-pointer" : "cursor-not-allowed"}`}
             >
               <div className="flex items-start justify-between gap-1">
@@ -241,7 +258,7 @@ export function AvailabilityCalendar({
                 </span>
               </div>
 
-              {availability && status !== "closed" && (
+              {availability && status !== "closed" && status !== "past" && (
                 <div className="mt-3 text-xs">
                   <p className="font-semibold">
                     {availability.availableBoxes} / {availability.totalBoxes}{" "}
