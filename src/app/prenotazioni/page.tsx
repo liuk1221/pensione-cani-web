@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AvailabilityCalendar,
   DayAvailability,
 } from "@/components/availability/AvailabilityCalendar";
+import { BookingRequestForm } from "@/components/bookings/BookingRequestForm";
 import {
   compareDateKeys,
   getDateKeysInRange,
@@ -70,6 +71,7 @@ function buildMockAvailability() {
 
 export default function PrenotazioniPage() {
   const availabilityByDate = useMemo(() => buildMockAvailability(), []);
+  const formSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [selectedStartDate, setSelectedStartDate] = useState<string | null>(
     null,
@@ -77,7 +79,7 @@ export default function PrenotazioniPage() {
   const [selectedEndDate, setSelectedEndDate] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState<string | null>(null);
 
-  function hasAvailableNight(date: string) {
+  function hasAvailableDate(date: string) {
     const availability = availabilityByDate[date];
 
     return (
@@ -85,36 +87,6 @@ export default function PrenotazioniPage() {
       availability.status !== "closed" &&
       availability.availableBoxes > 0
     );
-  }
-
-  function getFirstUnavailableDate(startDate: string, endDate: string) {
-    const occupiedDates = getOccupiedDatesForStay(startDate, endDate);
-
-    return occupiedDates.find((date) => !hasAvailableNight(date)) ?? null;
-  }
-
-  function isValidEndDate(startDate: string, endDate: string) {
-    if (compareDateKeys(endDate, startDate) < 0) {
-      return false;
-    }
-
-    return getFirstUnavailableDate(startDate, endDate) === null;
-  }
-
-  function isDayDisabled(date: string) {
-    if (!selectedStartDate || selectedEndDate) {
-      return !hasAvailableNight(date);
-    }
-
-    if (date === selectedStartDate) {
-      return false;
-    }
-
-    if (compareDateKeys(date, selectedStartDate) < 0) {
-      return !hasAvailableNight(date);
-    }
-
-    return !isValidEndDate(selectedStartDate, date);
   }
 
   function getOccupiedDatesForStay(startDate: string, endDate: string) {
@@ -127,12 +99,44 @@ export default function PrenotazioniPage() {
     });
   }
 
+  function getFirstUnavailableDate(startDate: string, endDate: string) {
+    const occupiedDates = getOccupiedDatesForStay(startDate, endDate);
+
+    return occupiedDates.find((date) => !hasAvailableDate(date)) ?? null;
+  }
+
+  function isValidEndDate(startDate: string, endDate: string) {
+    if (compareDateKeys(endDate, startDate) < 0) {
+      return false;
+    }
+
+    return getFirstUnavailableDate(startDate, endDate) === null;
+  }
+
+  function isDayDisabled(date: string) {
+    if (!selectedStartDate || selectedEndDate) {
+      return !hasAvailableDate(date);
+    }
+
+    if (date === selectedStartDate) {
+      return false;
+    }
+
+    if (compareDateKeys(date, selectedStartDate) < 0) {
+      return !hasAvailableDate(date);
+    }
+
+    return !isValidEndDate(selectedStartDate, date);
+  }
+
   function handleDayClick(date: string) {
     setSelectionError(null);
 
     if (!selectedStartDate || selectedEndDate) {
-      if (!hasAvailableNight(date)) {
-        setSelectionError("La data di arrivo deve avere almeno uno slot libero.");
+      if (!hasAvailableDate(date)) {
+        setSelectionError(
+          "La data di arrivo deve avere almeno uno slot libero.",
+        );
         return;
       }
 
@@ -142,7 +146,7 @@ export default function PrenotazioniPage() {
     }
 
     if (compareDateKeys(date, selectedStartDate) < 0) {
-      if (!hasAvailableNight(date)) {
+      if (!hasAvailableDate(date)) {
         setSelectionError(
           "La nuova data di arrivo deve avere almeno uno slot libero.",
         );
@@ -172,6 +176,20 @@ export default function PrenotazioniPage() {
     setSelectionError(null);
   }
 
+  function scrollToForm() {
+    if (!selectedStartDate || !selectedEndDate) {
+      setSelectionError(
+        "Seleziona prima una data di arrivo e una data di uscita.",
+      );
+      return;
+    }
+
+    formSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
   const occupiedDates =
     selectedStartDate && selectedEndDate
       ? getOccupiedDatesForStay(selectedStartDate, selectedEndDate)
@@ -186,6 +204,8 @@ export default function PrenotazioniPage() {
           }`
       : "-";
 
+  const canContinue = Boolean(selectedStartDate && selectedEndDate);
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
       <div className="max-w-3xl">
@@ -198,8 +218,9 @@ export default function PrenotazioniPage() {
         </h1>
 
         <p className="mt-4 text-slate-600">
-          Seleziona arrivo e uscita. La disponibilità viene calcolata a notti:
-          il giorno di arrivo occupa un box, il giorno di uscita no.
+          Seleziona arrivo e uscita. Se arrivo e uscita coincidono, la richiesta
+          viene considerata senza pernottamento. In caso di pernottamento, il
+          giorno di uscita non occupa il box.
         </p>
       </div>
 
@@ -249,6 +270,15 @@ export default function PrenotazioniPage() {
             Reset selezione
           </button>
 
+          <button
+            type="button"
+            onClick={scrollToForm}
+            disabled={!canContinue}
+            className="mt-4 w-full rounded-full bg-yellow-400 px-5 py-3 text-sm font-bold text-blue-950 shadow-sm transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Continua con la richiesta
+          </button>
+
           {selectionError && (
             <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">
               {selectionError}
@@ -258,16 +288,33 @@ export default function PrenotazioniPage() {
           <div className="mt-8 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-950">
             <p className="font-bold">Regola disponibilità</p>
             <p className="mt-2">
-              Il giorno di arrivo è il giorno in cui si effettuerà il check-in.
-              Il giorno di uscita è il giorno in cui si effettuerà il check-out.
-              Entrambi vanno eseguiti rispettando gli orari concordati con il personale. 
+              Anche un giorno al completo può essere selezionato come giorno di uscita.
+              La prenotazione può avvenire attraverso tutti i canali disponibili tra i contatti.
+              Le richieste sono da ritenersi <u>confermate solo una volta accettate dalla struttura</u>.
             </p>
           </div>
-
-          <div className="mt-6 rounded-2xl bg-yellow-50 p-4 text-sm leading-6 text-yellow-950">
-            .. FORM MOCK ...
-          </div>
         </aside>
+      </div>
+
+      <div ref={formSectionRef} className="mt-14 scroll-mt-28">
+        {canContinue ? (
+          <BookingRequestForm
+            startDate={selectedStartDate}
+            endDate={selectedEndDate}
+            stayLabel={stayLabel}
+          />
+        ) : (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-8 text-center shadow-sm">
+            <h2 className="text-2xl font-bold text-slate-950">
+              Completa prima la selezione delle date
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+              Dopo aver scelto arrivo e uscita dal calendario, potrai compilare
+              il modulo con i dati del proprietario e del cane.
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );

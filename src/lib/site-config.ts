@@ -3,7 +3,7 @@ export const siteConfig = {
   description: "Pensione per cani con prenotazioni online e gestione disponibilità.",
   phone: "+39 338 450 1079",
   email: "info@lapirella.it",
-  address: "Frazione Melano 140M, Fabriano",
+  address: "Frazione Melano 140M, Fabriano (AN)",
   whatsappNumber: "393384501079",
   navItems: [
     {

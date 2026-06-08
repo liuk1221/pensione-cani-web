@@ -125,12 +125,10 @@ export default function HomePage() {
               Disponibilità
             </p>
             <h2 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Calendario colorato in base ai box disponibili
+              Calendario prenotazione in base ai box disponibili
             </h2>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              Le prenotazioni vengono sempre confermate manualmente. Quando
-              l’admin conferma una richiesta, il sistema aggiorna
-              automaticamente la disponibilità mostrata sul sito.
+              Le prenotazioni vengono sempre confermate manualmente.
             </p>
 
             <div className="mt-8 space-y-4">
@@ -174,7 +172,7 @@ export default function HomePage() {
         <SectionTitle
           eyebrow="Prenotazioni"
           title="Richiesta semplice e conferma rapida"
-          description="Invia la richiesta per lo slot che vorresti prenotare, riceverai subito una mail di conferma della richiesta. Un nostro operatore ti ricontatterà il prima possibile per confermare la tua prenotazione!"
+          description="Invia la richiesta per lo slot che vorresti prenotare, riceverai subito una mail di avvenuta ricezione. Un nostro operatore ti ricontatterà il prima possibile per confermare la tua prenotazione!"
         />
 
         <div className="mx-auto mt-10 max-w-3xl rounded-3xl bg-blue-950 p-8 text-center text-white">
