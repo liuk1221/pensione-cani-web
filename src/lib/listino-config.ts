@@ -91,7 +91,7 @@ export const promotions: ListinoPromotion[] = [
   },
   {
     name: "Soggiorni lunghi",
-    condition: "Permanenze continuative superiori a 14 notti.",
+    condition: "Permanenze continuative superiori a 5 notti.",
     benefit: "-10% sul totale pensione",
   },
   {
