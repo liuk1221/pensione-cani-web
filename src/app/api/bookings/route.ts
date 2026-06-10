@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentAdmin } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-type ManualBookingBody = {
-  source?: unknown;
-  status?: unknown;
-
+type PublicBookingBody = {
   startDate?: unknown;
   endDate?: unknown;
 
@@ -22,7 +18,6 @@ type ManualBookingBody = {
   dogSterilized?: unknown;
 
   notes?: unknown;
-  adminNotes?: unknown;
 };
 
 type AvailabilityRow = {
@@ -101,7 +96,7 @@ async function checkAvailability(startDate: string, endDate: string) {
   });
 
   if (error) {
-    console.error("Manual booking availability check error:", error);
+    console.error("Public booking availability check error:", error);
 
     return {
       ok: false,
@@ -120,7 +115,7 @@ async function checkAvailability(startDate: string, endDate: string) {
   if (unavailableDay) {
     return {
       ok: false,
-      error: `Impossibile inserire la prenotazione confermata: la data ${unavailableDay.day} non ha slot disponibili.`,
+      error: `La data ${unavailableDay.day} non ha slot disponibili.`,
       status: 409,
     };
   }
@@ -132,75 +127,11 @@ async function checkAvailability(startDate: string, endDate: string) {
   };
 }
 
-export async function GET() {
-  const admin = await getCurrentAdmin();
-
-  if (!admin) {
-    return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("bookings")
-    .select(
-      `
-      id,
-      source,
-      status,
-      stay_type,
-      start_date,
-      end_date,
-      notes,
-      admin_notes,
-      created_at,
-      updated_at,
-      confirmed_at,
-      rejected_at,
-      cancelled_at,
-      customer:customers (
-        id,
-        first_name,
-        last_name,
-        email,
-        phone
-      ),
-      dog:dogs (
-        id,
-        name,
-        breed,
-        size,
-        age,
-        sex,
-        sterilized
-      )
-    `,
-    )
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Admin bookings fetch error:", error);
-
-    return NextResponse.json(
-      { error: "Errore durante il caricamento delle prenotazioni." },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json({
-    bookings: data ?? [],
-  });
-}
-
 export async function POST(request: NextRequest) {
-  const admin = await getCurrentAdmin();
-
-  if (!admin) {
-    return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
-  }
-
-  let body: ManualBookingBody;
+  let body: PublicBookingBody;
 
   try {
-    body = (await request.json()) as ManualBookingBody;
+    body = (await request.json()) as PublicBookingBody;
   } catch {
     return NextResponse.json(
       { error: "Body JSON non valido." },
@@ -236,14 +167,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const source =
-    body.source === "phone" || body.source === "admin" ? body.source : "admin";
-
-  const status =
-    body.status === "pending" || body.status === "confirmed"
-      ? body.status
-      : "confirmed";
-
   const dogSize = String(body.dogSize);
 
   if (!["small", "medium", "large", "giant"].includes(dogSize)) {
@@ -258,15 +181,13 @@ export async function POST(request: NextRequest) {
       ? body.dogSex
       : "unknown";
 
-  if (status === "confirmed") {
-    const availabilityCheck = await checkAvailability(startDate, endDate);
+  const availabilityCheck = await checkAvailability(startDate, endDate);
 
-    if (!availabilityCheck.ok) {
-      return NextResponse.json(
-        { error: availabilityCheck.error },
-        { status: availabilityCheck.status },
-      );
-    }
+  if (!availabilityCheck.ok) {
+    return NextResponse.json(
+      { error: availabilityCheck.error },
+      { status: availabilityCheck.status },
+    );
   }
 
   const { data: customer, error: customerError } = await supabaseAdmin
@@ -281,7 +202,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (customerError || !customer) {
-    console.error("Manual booking customer insert error:", customerError);
+    console.error("Public booking customer insert error:", customerError);
 
     return NextResponse.json(
       { error: "Errore durante il salvataggio del proprietario." },
@@ -304,7 +225,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (dogError || !dog) {
-    console.error("Manual booking dog insert error:", dogError);
+    console.error("Public booking dog insert error:", dogError);
 
     return NextResponse.json(
       { error: "Errore durante il salvataggio del cane." },
@@ -312,27 +233,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const now = new Date().toISOString();
-
   const { data: booking, error: bookingError } = await supabaseAdmin
     .from("bookings")
     .insert({
       customer_id: customer.id,
       dog_id: dog.id,
-      source,
-      status,
+      source: "online",
+      status: "pending",
       stay_type: getStayType(startDate, endDate),
       start_date: startDate,
       end_date: endDate,
       notes: normalizeOptionalString(body.notes),
-      admin_notes: normalizeOptionalString(body.adminNotes),
-      confirmed_at: status === "confirmed" ? now : null,
+      admin_notes: null,
+      confirmed_at: null,
     })
     .select("id")
     .single();
 
   if (bookingError || !booking) {
-    console.error("Manual booking insert error:", bookingError);
+    console.error("Public booking insert error:", bookingError);
 
     return NextResponse.json(
       { error: "Errore durante il salvataggio della prenotazione." },
@@ -343,7 +262,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(
     {
       bookingId: booking.id,
-      message: "Prenotazione manuale inserita correttamente.",
+      message: "Richiesta di prenotazione ricevuta correttamente.",
     },
     { status: 201 },
   );
