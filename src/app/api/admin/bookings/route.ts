@@ -52,6 +52,22 @@ function normalizeOptionalString(value: unknown) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function normalizeRequiredDbString(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
+}
+
+function normalizeEmailForDb(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim().toLowerCase();
+}
+
 function parseDogAge(value: unknown) {
   if (typeof value !== "string" || value.trim() === "") {
     return null;
@@ -225,13 +241,14 @@ export async function POST(request: NextRequest) {
   if (
     !isNonEmptyString(body.ownerName) ||
     !isNonEmptyString(body.ownerSurname) ||
-    !isNonEmptyString(body.email) ||
-    !isNonEmptyString(body.phone) ||
     !isNonEmptyString(body.dogName) ||
     !isNonEmptyString(body.dogSize)
   ) {
     return NextResponse.json(
-      { error: "Compila tutti i campi obbligatori." },
+      {
+        error:
+          "Compila i campi obbligatori: nome, cognome, nome cane e taglia.",
+      },
       { status: 400 },
     );
   }
@@ -274,8 +291,8 @@ export async function POST(request: NextRequest) {
     .insert({
       first_name: String(body.ownerName).trim(),
       last_name: String(body.ownerSurname).trim(),
-      email: String(body.email).trim().toLowerCase(),
-      phone: String(body.phone).trim(),
+      email: normalizeEmailForDb(body.email),
+      phone: normalizeRequiredDbString(body.phone),
     })
     .select("id")
     .single();

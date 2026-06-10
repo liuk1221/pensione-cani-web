@@ -1,5 +1,5 @@
 export const siteConfig = {
-  name: "Pirella Dog Resort",
+  name: "Pirella Pet Resort",
   description: "Pensione per cani con prenotazioni online e gestione disponibilità.",
   phone: "+39 338 450 1079",
   email: "info@lapirella.it",

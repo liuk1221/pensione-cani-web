@@ -85,7 +85,7 @@ export default function HomePage() {
                   Immagine struttura
                 </p>
                 <p className="mt-2 text-sm text-slate-500">
-                  Placeholder foto hero
+                  !!! WORK IN PROGRESS !!!
                 </p>
               </div>
             </div>

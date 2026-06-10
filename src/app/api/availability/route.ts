@@ -22,8 +22,6 @@ export async function GET(request: NextRequest) {
   const from = request.nextUrl.searchParams.get("from");
   const to = request.nextUrl.searchParams.get("to");
 
-  console.log("Availability request:", { from, to });
-
   if (!isValidDateKey(from) || !isValidDateKey(to)) {
     return NextResponse.json(
       {
@@ -40,18 +38,16 @@ export async function GET(request: NextRequest) {
   });
 
   if (error) {
-    console.error("Supabase RPC error:", error);
+    console.error("Availability API error:", error);
 
     return NextResponse.json(
       {
-        error: "Errore Supabase durante il caricamento della disponibilità.",
+        error: "Errore durante il caricamento della disponibilità.",
         details: error.message,
       },
       { status: 500 },
     );
   }
-
-  console.log("Availability rows:", data?.length ?? 0);
 
   const rows = (data ?? []) as AvailabilityRow[];
 

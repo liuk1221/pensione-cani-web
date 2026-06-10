@@ -10,8 +10,7 @@ export function Footer() {
         <div>
           <p className="text-lg font-bold">{siteConfig.name}</p>
           <p className="mt-3 max-w-sm text-sm leading-6 text-blue-100">
-            Pensione per cani con gestione delle prenotazioni, disponibilità
-            aggiornata e contatto diretto con la struttura.
+            La vacanza per lui e per te! 
           </p>
         </div>
 
