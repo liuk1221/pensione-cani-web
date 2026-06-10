@@ -151,19 +151,19 @@ export default function ListinoPage() {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-blue-800 bg-white text-slate-950">
-            <table className="w-full border-collapse text-left text-sm">
+            <table className="w-full table-fixed border-collapse text-left text-sm">
               <thead className="bg-yellow-400 text-blue-950">
                 <tr>
-                  <th scope="col" className="px-4 py-3 font-bold">
+                  <th scope="col" className="w-[56%] px-3 py-3 font-bold sm:px-4 md:w-[30%]">
                     Formula
                   </th>
                   <th
                     scope="col"
-                    className="hidden px-4 py-3 font-bold md:table-cell"
+                    className="hidden px-4 py-3 font-bold md:table-cell md:w-[45%]"
                   >
                     Condizione
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-bold">
+                  <th scope="col" className="w-[44%] px-3 py-3 text-right font-bold sm:px-4 md:w-[25%]">
                     Vantaggio
                   </th>
                 </tr>
@@ -172,7 +172,7 @@ export default function ListinoPage() {
               <tbody className="divide-y divide-slate-200">
                 {listinoConfig.promotions.map((promotion: ListinoPromotion) => (
                   <tr key={promotion.name} className="align-top">
-                    <td className="px-4 py-4">
+                    <td className="px-3 py-4 sm:px-4">
                       <p className="font-bold">{promotion.name}</p>
 
                       <p className="mt-1 text-xs leading-5 text-slate-500 md:hidden">
@@ -184,7 +184,7 @@ export default function ListinoPage() {
                       {promotion.condition}
                     </td>
 
-                    <td className="whitespace-nowrap px-4 py-4 text-right font-bold text-blue-900">
+                    <td className="break-words px-3 py-4 text-right font-bold leading-5 text-blue-900 sm:px-4">
                       {promotion.benefit}
                     </td>
                   </tr>
