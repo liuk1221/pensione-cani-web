@@ -37,6 +37,25 @@ function isNonEmptyString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function normalizePhone(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
+}
+
+function isValidPhoneNumber(value: unknown) {
+  const phone = normalizePhone(value);
+  const digits = phone.replace(/\D/g, "");
+
+  return (
+    digits.length >= 7 &&
+    digits.length <= 15 &&
+    /^\+?[0-9\s().-]+$/.test(phone)
+  );
+}
+
 function normalizeOptionalString(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -167,6 +186,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!isValidPhoneNumber(body.phone)) {
+    return NextResponse.json(
+      { error: "Inserisci un numero di telefono valido." },
+      { status: 400 },
+    );
+  }
+
   const dogSize = String(body.dogSize);
 
   if (!["small", "medium", "large", "giant"].includes(dogSize)) {
@@ -196,7 +222,7 @@ export async function POST(request: NextRequest) {
       first_name: String(body.ownerName).trim(),
       last_name: String(body.ownerSurname).trim(),
       email: String(body.email).trim().toLowerCase(),
-      phone: String(body.phone).trim(),
+      phone: normalizePhone(body.phone),
     })
     .select("id")
     .single();

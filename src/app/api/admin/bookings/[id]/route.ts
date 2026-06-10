@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
+import { getDateKeysInRange } from "@/lib/date-utils";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const allowedStatuses = [
@@ -42,23 +43,29 @@ function isBookingStatus(value: unknown): value is BookingStatus {
   );
 }
 
-function getOccupiedDaysForBooking(
-  booking: CurrentBooking,
-  rows: AvailabilityRow[],
-) {
-  if (booking.stay_type === "day_care") {
-    return rows.filter((row) => row.day === booking.start_date);
-  }
-
-  return rows.filter(
-    (row) => row.day >= booking.start_date && row.day < booking.end_date,
-  );
+function isValidDateKey(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-async function checkAvailabilityBeforeConfirm(booking: CurrentBooking) {
+function getStayType(startDate: string, endDate: string) {
+  return startDate === endDate ? "day_care" : "overnight";
+}
+
+function getStayDays(startDate: string, endDate: string) {
+  if (startDate === endDate) {
+    return [startDate];
+  }
+
+  return getDateKeysInRange(startDate, endDate);
+}
+
+async function checkAvailabilityBeforeConfirm(
+  startDate: string,
+  endDate: string,
+) {
   const { data, error } = await supabaseAdmin.rpc("get_public_availability", {
-    from_date: booking.start_date,
-    to_date: booking.end_date,
+    from_date: startDate,
+    to_date: endDate,
   });
 
   if (error) {
@@ -66,22 +73,29 @@ async function checkAvailabilityBeforeConfirm(booking: CurrentBooking) {
 
     return {
       ok: false,
-      error: "Errore durante la verifica della disponibilità.",
+      error: "Errore durante la verifica della disponibilita.",
+      unavailableDays: [],
       status: 500,
     };
   }
 
   const rows = (data ?? []) as AvailabilityRow[];
-  const occupiedDays = getOccupiedDaysForBooking(booking, rows);
+  const rowsByDay = new Map(rows.map((row) => [row.day, row]));
+  const unavailableDays = getStayDays(startDate, endDate).filter((day) => {
+    const availability = rowsByDay.get(day);
 
-  const unavailableDay = occupiedDays.find(
-    (day) => day.status === "closed" || day.available_boxes <= 0,
-  );
+    return (
+      !availability ||
+      availability.status === "closed" ||
+      availability.available_boxes <= 0
+    );
+  });
 
-  if (unavailableDay) {
+  if (unavailableDays.length > 0) {
     return {
       ok: false,
-      error: `Impossibile confermare: la data ${unavailableDay.day} non ha più slot disponibili.`,
+      error: `Impossibile confermare: non ci sono slot disponibili per ${unavailableDays.join(", ")}.`,
+      unavailableDays,
       status: 409,
     };
   }
@@ -89,6 +103,7 @@ async function checkAvailabilityBeforeConfirm(booking: CurrentBooking) {
   return {
     ok: true,
     error: null,
+    unavailableDays: [],
     status: 200,
   };
 }
@@ -108,6 +123,8 @@ export async function PATCH(
   let body: {
     status?: unknown;
     adminNotes?: unknown;
+    startDate?: unknown;
+    endDate?: unknown;
   };
 
   try {
@@ -143,13 +160,34 @@ export async function PATCH(
   }
 
   const booking = currentBooking as CurrentBooking;
+  const nextStartDate =
+    body.status === "confirmed" && isValidDateKey(body.startDate)
+      ? body.startDate
+      : booking.start_date;
+  const nextEndDate =
+    body.status === "confirmed" && isValidDateKey(body.endDate)
+      ? body.endDate
+      : booking.end_date;
+
+  if (nextEndDate < nextStartDate) {
+    return NextResponse.json(
+      { error: "La data di uscita non puo essere precedente all'arrivo." },
+      { status: 400 },
+    );
+  }
 
   if (body.status === "confirmed" && booking.status !== "confirmed") {
-    const availabilityCheck = await checkAvailabilityBeforeConfirm(booking);
+    const availabilityCheck = await checkAvailabilityBeforeConfirm(
+      nextStartDate,
+      nextEndDate,
+    );
 
     if (!availabilityCheck.ok) {
       return NextResponse.json(
-        { error: availabilityCheck.error },
+        {
+          error: availabilityCheck.error,
+          unavailableDays: availabilityCheck.unavailableDays,
+        },
         { status: availabilityCheck.status },
       );
     }
@@ -170,6 +208,9 @@ export async function PATCH(
     updatePayload.confirmed_at = now;
     updatePayload.rejected_at = null;
     updatePayload.cancelled_at = null;
+    updatePayload.start_date = nextStartDate;
+    updatePayload.end_date = nextEndDate;
+    updatePayload.stay_type = getStayType(nextStartDate, nextEndDate);
   }
 
   if (body.status === "rejected") {
@@ -188,14 +229,14 @@ export async function PATCH(
     .from("bookings")
     .update(updatePayload)
     .eq("id", id)
-    .select("id, status, admin_notes")
+    .select("id, status, admin_notes, stay_type, start_date, end_date")
     .single();
 
   if (error) {
     console.error("Admin booking update error:", error);
 
     return NextResponse.json(
-      { error: "Errore durante l’aggiornamento della prenotazione." },
+      { error: "Errore durante l'aggiornamento della prenotazione." },
       { status: 500 },
     );
   }
@@ -243,7 +284,7 @@ export async function DELETE(
     console.error("Booking delete error:", bookingDeleteError);
 
     return NextResponse.json(
-      { error: "Errore durante l’eliminazione della prenotazione." },
+      { error: "Errore durante l'eliminazione della prenotazione." },
       { status: 500 },
     );
   }

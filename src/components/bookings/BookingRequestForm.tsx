@@ -9,6 +9,19 @@ type BookingRequestFormProps = {
   stayLabel: string;
 };
 
+const phoneInputPattern = "\\+?[0-9\\s().-]{7,20}";
+
+function isValidPhoneNumber(value: string) {
+  const phone = value.trim();
+  const digits = phone.replace(/\D/g, "");
+
+  return (
+    digits.length >= 7 &&
+    digits.length <= 15 &&
+    /^\+?[0-9\s().-]+$/.test(phone)
+  );
+}
+
 export function BookingRequestForm({
   startDate,
   endDate,
@@ -50,6 +63,12 @@ export function BookingRequestForm({
       dogSterilized: String(formData.get("dogSterilized") ?? ""),
       notes: String(formData.get("notes") ?? ""),
     };
+
+    if (!isValidPhoneNumber(payload.phone)) {
+      setSubmitError("Inserisci un numero di telefono valido.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const response = await fetch("/api/bookings", {
@@ -121,7 +140,15 @@ export function BookingRequestForm({
           <Field label="Nome" name="ownerName" required />
           <Field label="Cognome" name="ownerSurname" required />
           <Field label="Email" name="email" type="email" required />
-          <Field label="Telefono" name="phone" type="tel" required />
+          <Field
+            label="Telefono"
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            pattern={phoneInputPattern}
+            title="Inserisci un numero di telefono valido."
+            required
+          />
         </div>
       </div>
 
@@ -240,6 +267,9 @@ type FieldProps = {
   type?: string;
   required?: boolean;
   min?: string;
+  pattern?: string;
+  inputMode?: "tel";
+  title?: string;
 };
 
 function Field({
@@ -248,6 +278,9 @@ function Field({
   type = "text",
   required = false,
   min,
+  pattern,
+  inputMode,
+  title,
 }: FieldProps) {
   return (
     <div>
@@ -257,6 +290,9 @@ function Field({
         type={type}
         required={required}
         min={min}
+        pattern={pattern}
+        inputMode={inputMode}
+        title={title}
         className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
       />
     </div>

@@ -54,6 +54,7 @@ type BookingsResponse = BaseApiResponse & {
 
 type ActionResponse = BaseApiResponse & {
   ok?: boolean;
+  unavailableDays?: string[];
 };
 
 const statusLabels: Record<BookingStatus, string> = {
@@ -81,6 +82,14 @@ const statusClasses: Record<BookingStatus, string> = {
 function formatDateKey(date: string) {
   const [year, month, day] = date.split("-");
   return `${day}/${month}/${year}`;
+}
+
+function formatDateList(dates: string[]) {
+  return dates.map(formatDateKey).join(", ");
+}
+
+function isValidDateKey(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function formatDateTime(date: string) {
@@ -168,6 +177,9 @@ export default function AdminPrenotazioniPage() {
   const [adminNotesById, setAdminNotesById] = useState<Record<string, string>>(
     {},
   );
+  const [bookingDateEdits, setBookingDateEdits] = useState<
+    Record<string, { startDate: string; endDate: string }>
+  >({});
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -196,6 +208,17 @@ export default function AdminPrenotazioniPage() {
     setAdminNotesById(
       Object.fromEntries(
         nextBookings.map((booking) => [booking.id, booking.admin_notes ?? ""]),
+      ),
+    );
+    setBookingDateEdits(
+      Object.fromEntries(
+        nextBookings.map((booking) => [
+          booking.id,
+          {
+            startDate: booking.start_date,
+            endDate: booking.end_date,
+          },
+        ]),
       ),
     );
   }
@@ -264,6 +287,24 @@ export default function AdminPrenotazioniPage() {
       return;
     }
 
+    const dateEdit = bookingDateEdits[id] ?? {
+      startDate: currentBooking.start_date,
+      endDate: currentBooking.end_date,
+    };
+
+    if (
+      status === "confirmed" &&
+      (!isValidDateKey(dateEdit.startDate) || !isValidDateKey(dateEdit.endDate))
+    ) {
+      setError("Inserisci un intervallo di date valido prima di confermare.");
+      return;
+    }
+
+    if (status === "confirmed" && dateEdit.endDate < dateEdit.startDate) {
+      setError("La data di uscita non puo essere precedente all'arrivo.");
+      return;
+    }
+
     try {
       setUpdatingId(id);
       setError(null);
@@ -277,12 +318,26 @@ export default function AdminPrenotazioniPage() {
         body: JSON.stringify({
           status,
           adminNotes: adminNotesById[id] ?? "",
+          ...(status === "confirmed"
+            ? {
+                startDate: dateEdit.startDate,
+                endDate: dateEdit.endDate,
+              }
+            : {}),
         }),
       });
 
       const payload = await readJsonResponse<ActionResponse>(response);
 
       if (!response.ok) {
+        if (status === "confirmed" && payload.unavailableDays?.length) {
+          window.alert(
+            `Impossibile confermare la prenotazione.\n\nGiorni senza disponibilita: ${formatDateList(
+              payload.unavailableDays,
+            )}\n\nLa prenotazione resta tra le richieste in attesa.`,
+          );
+        }
+
         throw new Error(
           payload.error ?? "Errore durante l’aggiornamento prenotazione.",
         );
@@ -854,6 +909,10 @@ export default function AdminPrenotazioniPage() {
           {filteredBookings.map((booking) => {
             const isExpanded = expandedId === booking.id;
             const isUpdating = updatingId === booking.id;
+            const dateEdit = bookingDateEdits[booking.id] ?? {
+              startDate: booking.start_date,
+              endDate: booking.end_date,
+            };
 
             return (
               <article
@@ -968,6 +1027,53 @@ export default function AdminPrenotazioniPage() {
                     <p className="text-sm text-slate-600">
                       Uscita: {formatDateKey(booking.end_date)}
                     </p>
+
+                    {booking.status === "pending" ? (
+                      <div className="mt-4 grid gap-3">
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Nuovo arrivo
+                          </label>
+
+                          <input
+                            type="date"
+                            value={dateEdit.startDate}
+                            onChange={(event) =>
+                              setBookingDateEdits((current) => ({
+                                ...current,
+                                [booking.id]: {
+                                  ...dateEdit,
+                                  startDate: event.target.value,
+                                },
+                              }))
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Nuova uscita
+                          </label>
+
+                          <input
+                            type="date"
+                            value={dateEdit.endDate}
+                            min={dateEdit.startDate}
+                            onChange={(event) =>
+                              setBookingDateEdits((current) => ({
+                                ...current,
+                                [booking.id]: {
+                                  ...dateEdit,
+                                  endDate: event.target.value,
+                                },
+                              }))
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="rounded-2xl bg-slate-50 p-4">
