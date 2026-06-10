@@ -212,7 +212,10 @@ export function AvailabilityCalendar({
 
       <div className="grid grid-cols-7 gap-1 text-center sm:gap-2">
         {weekDays.map((day) => (
-          <div key={day} className="text-xs font-bold uppercase text-slate-400">
+          <div
+            key={day}
+            className="text-[11px] font-bold uppercase text-slate-400 sm:text-xs"
+          >
             {day}
           </div>
         ))}
@@ -243,30 +246,44 @@ export function AvailabilityCalendar({
               key={dateKey}
               type="button"
               disabled={!isClickable}
+              aria-label={`${date.getDate()} ${monthNames[month]} ${year}: ${getStatusLabel(
+                status,
+              )}${
+                availability && status !== "closed" && status !== "past"
+                  ? `, ${availability.availableBoxes} su ${availability.totalBoxes} liberi`
+                  : ""
+              }`}
               onClick={() => onDayClick?.(dateKey)}
-              className={`min-h-20 rounded-2xl border p-2 text-left transition sm:min-h-24 ${getDayClasses(
+              className={`min-h-[4.25rem] rounded-xl border px-1 py-1.5 text-center transition sm:min-h-24 sm:rounded-2xl sm:p-2 sm:text-left ${getDayClasses(
               status,
               selectionState,
               disabled,
               )} ${isClickable ? "cursor-pointer" : "cursor-not-allowed"}`}
             >
-              <div className="flex items-start justify-between gap-1">
-                <span className="text-sm font-bold">{date.getDate()}</span>
+              <div className="flex items-start justify-center gap-1 sm:justify-between">
+                <span className="text-sm font-bold leading-none sm:text-sm sm:leading-normal">
+                  {date.getDate()}
+                </span>
 
-                <span className="rounded-full bg-white/70 px-1.5 py-1 text-[9px] font-bold sm:px-2 sm:text-[10px]">
+                <span className="availability-day-status rounded-full bg-white/70 px-2 py-1 text-[10px] font-bold">
                   {getStatusLabel(status)}
                 </span>
               </div>
 
               {availability && status !== "closed" && status !== "past" && (
-                <div className="mt-3 text-xs">
+                <div className="mt-2 leading-none sm:mt-3 sm:text-xs sm:leading-normal">
                   <p className="font-semibold">
-                    {availability.availableBoxes} / {availability.totalBoxes}{" "}
-                    liberi
+                    <span className="availability-mobile-count">
+                      {availability.availableBoxes}/{availability.totalBoxes}
+                    </span>
+                    <span className="availability-desktop-count">
+                      {availability.availableBoxes} / {availability.totalBoxes}{" "}
+                      liberi
+                    </span>
                   </p>
 
                   {mode === "admin" && (
-                    <p className="mt-1 opacity-80">
+                    <p className="mt-1 hidden opacity-80 sm:block">
                       {availability.occupiedBoxes} occupati
                     </p>
                   )}
