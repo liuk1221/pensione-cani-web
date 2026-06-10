@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type ConfirmedBooking = {
   stay_type: "day_care" | "overnight";
   start_date: string;
   end_date: string;
+};
+
+type DashboardBooking = ConfirmedBooking & {
+  status: "pending" | "confirmed" | "rejected" | "cancelled" | "completed";
 };
 
 function getTodayDateKey() {
@@ -27,30 +34,10 @@ function isBookingActiveToday(booking: ConfirmedBooking, todayKey: string) {
 async function getAdminDashboardData() {
   const todayKey = getTodayDateKey();
 
-  const [
-    pendingResponse,
-    confirmedResponse,
-    totalResponse,
-    confirmedBookingsResponse,
-    settingsResponse,
-  ] = await Promise.all([
+  const [bookingsResponse, settingsResponse] = await Promise.all([
     supabaseAdmin
       .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
-
-    supabaseAdmin
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "confirmed"),
-
-    supabaseAdmin.from("bookings").select("id", { count: "exact", head: true }),
-
-    supabaseAdmin
-      .from("bookings")
-      .select("stay_type, start_date, end_date")
-      .eq("status", "confirmed"),
-
+      .select("status, stay_type, start_date, end_date"),
     supabaseAdmin
       .from("app_settings")
       .select("total_boxes")
@@ -59,23 +46,24 @@ async function getAdminDashboardData() {
   ]);
 
   const errors = [
-    pendingResponse.error,
-    confirmedResponse.error,
-    totalResponse.error,
-    confirmedBookingsResponse.error,
+    bookingsResponse.error,
     settingsResponse.error,
   ].filter(Boolean);
 
-  const confirmedBookings = (confirmedBookingsResponse.data ?? []) as ConfirmedBooking[];
+  const bookings = (bookingsResponse.data ?? []) as DashboardBooking[];
+  const confirmedBookings = bookings.filter(
+    (booking) => booking.status === "confirmed",
+  );
 
   const activeTodayCount = confirmedBookings.filter((booking) =>
     isBookingActiveToday(booking, todayKey),
   ).length;
 
   return {
-    pendingCount: pendingResponse.count ?? 0,
-    confirmedCount: confirmedResponse.count ?? 0,
-    totalCount: totalResponse.count ?? 0,
+    pendingCount: bookings.filter((booking) => booking.status === "pending")
+      .length,
+    confirmedCount: confirmedBookings.length,
+    totalCount: bookings.length,
     activeTodayCount,
     totalBoxes: settingsResponse.data?.total_boxes ?? 0,
     hasError: errors.length > 0,
@@ -145,6 +133,8 @@ export default async function AdminPage() {
       button: "Gestisci disponibilità",
     },
   ];
+
+  void quickActions;
 
 return (
   <section className="mx-auto flex min-h-[calc(100svh-5rem)] max-w-7xl flex-col px-4 py-12 sm:px-6 lg:px-8">
