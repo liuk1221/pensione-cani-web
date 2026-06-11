@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
 import { getDateKeysInRange } from "@/lib/date-utils";
+import { sendBookingStatusEmail } from "@/lib/email/booking-emails";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const allowedStatuses = [
@@ -13,12 +14,26 @@ const allowedStatuses = [
 
 type BookingStatus = (typeof allowedStatuses)[number];
 
+type BookingCustomer = {
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+};
+
+type BookingDog = {
+  name: string | null;
+};
+
+type BookingRelation<T> = T | T[] | null;
+
 type CurrentBooking = {
   id: string;
   status: BookingStatus;
   stay_type: "day_care" | "overnight";
   start_date: string;
   end_date: string;
+  customer: BookingRelation<BookingCustomer>;
+  dog: BookingRelation<BookingDog>;
 };
 
 type BookingToDelete = {
@@ -57,6 +72,19 @@ function getStayDays(startDate: string, endDate: string) {
   }
 
   return getDateKeysInRange(startDate, endDate);
+}
+
+function getSingleRelation<T>(relation: BookingRelation<T>) {
+  return Array.isArray(relation) ? (relation[0] ?? null) : relation;
+}
+
+function getCustomerDisplayName(customer: BookingCustomer | null) {
+  const fullName = [customer?.first_name, customer?.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return fullName || "Cliente";
 }
 
 async function checkAvailabilityBeforeConfirm(
@@ -146,7 +174,23 @@ export async function PATCH(
   const { data: currentBooking, error: currentBookingError } =
     await supabaseAdmin
       .from("bookings")
-      .select("id, status, stay_type, start_date, end_date")
+      .select(
+        `
+        id,
+        status,
+        stay_type,
+        start_date,
+        end_date,
+        customer:customers (
+          first_name,
+          last_name,
+          email
+        ),
+        dog:dogs (
+          name
+        )
+      `,
+      )
       .eq("id", id)
       .single();
 
@@ -239,6 +283,30 @@ export async function PATCH(
       { error: "Errore durante l'aggiornamento della prenotazione." },
       { status: 500 },
     );
+  }
+
+  const shouldSendStatusEmail =
+    (data.status === "confirmed" ||
+      data.status === "rejected" ||
+      data.status === "completed") &&
+    (booking.status !== data.status ||
+      booking.start_date !== data.start_date ||
+      booking.end_date !== data.end_date);
+
+  const customer = getSingleRelation(booking.customer);
+  const dog = getSingleRelation(booking.dog);
+
+  if (shouldSendStatusEmail && customer?.email) {
+    await sendBookingStatusEmail({
+      to: customer.email,
+      ownerName: getCustomerDisplayName(customer),
+      dogName: dog?.name ?? "il tuo cane",
+      startDate: data.start_date,
+      endDate: data.end_date,
+      status: data.status,
+    }).catch((emailError) => {
+      console.error("Admin booking status email error:", emailError);
+    });
   }
 
   return NextResponse.json({
