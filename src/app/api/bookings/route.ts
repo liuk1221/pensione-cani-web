@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sendBookingReceivedEmail } from "@/lib/email/booking-emails";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PublicBookingBody = {
@@ -284,6 +285,16 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+
+  await sendBookingReceivedEmail({
+    to: String(body.email).trim().toLowerCase(),
+    ownerName: String(body.ownerName).trim(),
+    dogName: String(body.dogName).trim(),
+    startDate,
+    endDate,
+  }).catch((error) => {
+    console.error("Public booking received email error:", error);
+  });
 
   return NextResponse.json(
     {
