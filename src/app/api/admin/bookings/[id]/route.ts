@@ -40,6 +40,11 @@ type BookingToDelete = {
   id: string;
   dog_id: string;
   customer_id: string;
+  status: BookingStatus;
+  start_date: string;
+  end_date: string;
+  customer: BookingRelation<BookingCustomer>;
+  dog: BookingRelation<BookingDog>;
 };
 
 type AvailabilityRow = {
@@ -328,7 +333,24 @@ export async function DELETE(
 
   const { data: booking, error: bookingFetchError } = await supabaseAdmin
     .from("bookings")
-    .select("id, dog_id, customer_id")
+    .select(
+      `
+      id,
+      dog_id,
+      customer_id,
+      status,
+      start_date,
+      end_date,
+      customer:customers (
+        first_name,
+        last_name,
+        email
+      ),
+      dog:dogs (
+        name
+      )
+    `,
+    )
     .eq("id", id)
     .single();
 
@@ -342,6 +364,8 @@ export async function DELETE(
   }
 
   const bookingToDelete = booking as BookingToDelete;
+  const customer = getSingleRelation(bookingToDelete.customer);
+  const dog = getSingleRelation(bookingToDelete.dog);
 
   const { error: bookingDeleteError } = await supabaseAdmin
     .from("bookings")
@@ -355,6 +379,19 @@ export async function DELETE(
       { error: "Errore durante l'eliminazione della prenotazione." },
       { status: 500 },
     );
+  }
+
+  if (bookingToDelete.status === "pending" && customer?.email) {
+    await sendBookingStatusEmail({
+      to: customer.email,
+      ownerName: getCustomerDisplayName(customer),
+      dogName: dog?.name ?? "il tuo cane",
+      startDate: bookingToDelete.start_date,
+      endDate: bookingToDelete.end_date,
+      status: "rejected",
+    }).catch((emailError) => {
+      console.error("Deleted pending booking rejection email error:", emailError);
+    });
   }
 
   const { count: dogBookingCount, error: dogBookingCountError } =

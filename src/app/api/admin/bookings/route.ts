@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
+import { sendBookingReceivedEmail } from "@/lib/email/booking-emails";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type ManualBookingBody = {
@@ -66,6 +67,10 @@ function normalizeEmailForDb(value: unknown) {
   }
 
   return value.trim().toLowerCase();
+}
+
+function hasEmail(value: unknown) {
+  return normalizeEmailForDb(value).length > 0;
 }
 
 function parseDogAge(value: unknown) {
@@ -355,6 +360,18 @@ export async function POST(request: NextRequest) {
       { error: "Errore durante il salvataggio della prenotazione." },
       { status: 500 },
     );
+  }
+
+  if (hasEmail(body.email)) {
+    await sendBookingReceivedEmail({
+      to: normalizeEmailForDb(body.email),
+      ownerName: String(body.ownerName).trim(),
+      dogName: String(body.dogName).trim(),
+      startDate,
+      endDate,
+    }).catch((emailError) => {
+      console.error("Manual booking received email error:", emailError);
+    });
   }
 
   return NextResponse.json(
