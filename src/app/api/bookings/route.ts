@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendBookingReceivedEmail } from "@/lib/email/booking-emails";
+import {
+  sendBookingAdminNotificationEmail,
+  sendBookingReceivedEmail,
+} from "@/lib/email/booking-emails";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PublicBookingBody = {
@@ -28,6 +31,10 @@ type AvailabilityRow = {
   blocked_boxes: number;
   available_boxes: number;
   status: "available" | "limited" | "full" | "closed";
+};
+
+type AdminProfile = {
+  email: string | null;
 };
 
 function isValidDateKey(value: unknown): value is string {
@@ -147,6 +154,25 @@ async function checkAvailability(startDate: string, endDate: string) {
   };
 }
 
+async function getAdminNotificationRecipients() {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("email")
+    .eq("role", "admin");
+
+  if (error) {
+    console.error("Admin notification recipients fetch error:", error);
+
+    return [];
+  }
+
+  const emails = ((data ?? []) as AdminProfile[])
+    .map((profile) => profile.email?.trim().toLowerCase() ?? "")
+    .filter(Boolean);
+
+  return Array.from(new Set(emails));
+}
+
 export async function POST(request: NextRequest) {
   let body: PublicBookingBody;
 
@@ -207,6 +233,16 @@ export async function POST(request: NextRequest) {
     body.dogSex === "male" || body.dogSex === "female"
       ? body.dogSex
       : "unknown";
+  const dogAge = parseDogAge(body.dogAge);
+  const dogSterilized = parseSterilized(body.dogSterilized);
+  const ownerName = String(body.ownerName).trim();
+  const ownerSurname = String(body.ownerSurname).trim();
+  const ownerEmail = String(body.email).trim().toLowerCase();
+  const ownerPhone = normalizePhone(body.phone);
+  const dogName = String(body.dogName).trim();
+  const dogBreed = normalizeOptionalString(body.dogBreed);
+  const notes = normalizeOptionalString(body.notes);
+  const stayType = getStayType(startDate, endDate);
 
   const availabilityCheck = await checkAvailability(startDate, endDate);
 
@@ -220,10 +256,10 @@ export async function POST(request: NextRequest) {
   const { data: customer, error: customerError } = await supabaseAdmin
     .from("customers")
     .insert({
-      first_name: String(body.ownerName).trim(),
-      last_name: String(body.ownerSurname).trim(),
-      email: String(body.email).trim().toLowerCase(),
-      phone: normalizePhone(body.phone),
+      first_name: ownerName,
+      last_name: ownerSurname,
+      email: ownerEmail,
+      phone: ownerPhone,
     })
     .select("id")
     .single();
@@ -241,12 +277,12 @@ export async function POST(request: NextRequest) {
     .from("dogs")
     .insert({
       customer_id: customer.id,
-      name: String(body.dogName).trim(),
-      breed: normalizeOptionalString(body.dogBreed),
+      name: dogName,
+      breed: dogBreed,
       size: dogSize,
-      age: parseDogAge(body.dogAge),
+      age: dogAge,
       sex: dogSex,
-      sterilized: parseSterilized(body.dogSterilized),
+      sterilized: dogSterilized,
     })
     .select("id")
     .single();
@@ -267,14 +303,14 @@ export async function POST(request: NextRequest) {
       dog_id: dog.id,
       source: "online",
       status: "pending",
-      stay_type: getStayType(startDate, endDate),
+      stay_type: stayType,
       start_date: startDate,
       end_date: endDate,
-      notes: normalizeOptionalString(body.notes),
+      notes,
       admin_notes: null,
       confirmed_at: null,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
 
   if (bookingError || !booking) {
@@ -287,14 +323,47 @@ export async function POST(request: NextRequest) {
   }
 
   await sendBookingReceivedEmail({
-    to: String(body.email).trim().toLowerCase(),
-    ownerName: String(body.ownerName).trim(),
-    dogName: String(body.dogName).trim(),
+    to: ownerEmail,
+    ownerName,
+    dogName,
     startDate,
     endDate,
   }).catch((error) => {
     console.error("Public booking received email error:", error);
   });
+
+  const adminRecipients = await getAdminNotificationRecipients();
+
+  await Promise.all(
+    adminRecipients.map((to) =>
+      sendBookingAdminNotificationEmail({
+        to,
+        bookingId: booking.id,
+        receivedAt: booking.created_at ?? null,
+        ownerName,
+        ownerSurname,
+        ownerEmail,
+        ownerPhone,
+        dogName,
+        dogBreed,
+        dogSize,
+        dogAge,
+        dogSex,
+        dogSterilized,
+        startDate,
+        endDate,
+        stayType,
+        source: "online",
+        status: "pending",
+        notes,
+      }).catch((error) => {
+        console.error("Public booking admin notification email error:", {
+          recipient: to,
+          error,
+        });
+      }),
+    ),
+  );
 
   return NextResponse.json(
     {
