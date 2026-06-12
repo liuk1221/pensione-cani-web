@@ -1,22 +1,23 @@
 import {
   bookingPricing,
   extraServices,
-  type DogSize,
   type ExtraServiceId,
 } from "@/lib/listino-config";
 import { getDateKeysInRange } from "@/lib/date-utils";
 
 export type EstimateDog = {
-  size: DogSize | "";
+  size?: string | "";
 };
 
 export type BookingEstimate = {
   stayType: "day_care" | "overnight";
   quantity: number;
   dogCount: number;
+  overnightUnitRateCents: number | null;
+  overnightRateLabel: string | null;
   baseSubtotalCents: number;
+  baseBeforeDiscountsCents: number;
   secondDogDiscountCents: number;
-  longStayDiscountCents: number;
   extrasSubtotalCents: number;
   totalCents: number;
   selectedExtras: Array<{
@@ -48,6 +49,14 @@ export function getStayType(startDate: string, endDate: string) {
   return startDate === endDate ? "day_care" : "overnight";
 }
 
+function getOvernightRateTier(quantity: number) {
+  return bookingPricing.overnightRateTiers.reduce(
+    (selectedTier, tier) =>
+      quantity >= tier.minNights ? tier : selectedTier,
+    bookingPricing.overnightRateTiers[0],
+  );
+}
+
 export function calculateBookingEstimate(params: {
   startDate: string;
   endDate: string;
@@ -58,17 +67,20 @@ export function calculateBookingEstimate(params: {
   const quantity = getStayQuantity(params.startDate, params.endDate);
   const validDogs = params.dogs.slice(0, bookingPricing.maxDogsPerBooking);
   const dogCount = validDogs.length;
-  const isComplete = dogCount > 0 && validDogs.every((dog) => dog.size);
+  const isComplete = dogCount > 0;
+  const overnightRateTier =
+    stayType === "overnight" ? getOvernightRateTier(quantity) : null;
+  const overnightUnitRateCents = overnightRateTier?.amountCents ?? null;
 
   const baseBeforeSharedBoxDiscount = validDogs.reduce((total, dog) => {
-    if (!dog.size) {
+    if (!dog) {
       return total;
     }
 
     const unitRate =
       stayType === "day_care"
         ? bookingPricing.dayCareRateCents
-        : bookingPricing.overnightRatesBySize[dog.size];
+        : (overnightUnitRateCents ?? bookingPricing.dayCareRateCents);
 
     return total + unitRate * quantity;
   }, 0);
@@ -76,12 +88,10 @@ export function calculateBookingEstimate(params: {
   const secondDogDiscountCents =
     dogCount >= 2
       ? Math.round(
-          ((validDogs[1]?.size
-            ? (stayType === "day_care"
-                ? bookingPricing.dayCareRateCents
-                : bookingPricing.overnightRatesBySize[validDogs[1].size]) *
-              quantity
-            : 0) *
+          ((stayType === "day_care"
+            ? bookingPricing.dayCareRateCents
+            : (overnightUnitRateCents ?? 0)) *
+            quantity *
             bookingPricing.secondDogDiscountPercent) /
             100,
         )
@@ -89,13 +99,6 @@ export function calculateBookingEstimate(params: {
 
   const baseSubtotalCents =
     baseBeforeSharedBoxDiscount - secondDogDiscountCents;
-
-  const longStayDiscountCents =
-    stayType === "overnight" && quantity >= bookingPricing.longStayMinNights
-      ? Math.round(
-          (baseSubtotalCents * bookingPricing.longStayDiscountPercent) / 100,
-        )
-      : 0;
 
   const selectedExtras = extraServices
     .filter((service) => params.extraServiceIds.includes(service.id ?? ""))
@@ -126,11 +129,13 @@ export function calculateBookingEstimate(params: {
     stayType,
     quantity,
     dogCount,
+    overnightUnitRateCents,
+    overnightRateLabel: overnightRateTier?.label ?? null,
     baseSubtotalCents,
+    baseBeforeDiscountsCents: baseBeforeSharedBoxDiscount,
     secondDogDiscountCents,
-    longStayDiscountCents,
     extrasSubtotalCents,
-    totalCents: baseSubtotalCents - longStayDiscountCents + extrasSubtotalCents,
+    totalCents: baseSubtotalCents + extrasSubtotalCents,
     selectedExtras,
     isComplete,
     hasMinimumPriceServices,

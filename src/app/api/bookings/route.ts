@@ -28,6 +28,8 @@ type PublicBookingBody = {
   ownerSurname?: unknown;
   email?: unknown;
   phone?: unknown;
+  expectedArrivalTime?: unknown;
+  expectedPickupTime?: unknown;
 
   dogs?: unknown;
   extraServiceIds?: unknown;
@@ -101,6 +103,16 @@ function normalizeOptionalString(value: unknown) {
   const trimmed = value.trim();
 
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalTime(value: unknown) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return /^\d{2}:\d{2}$/.test(trimmed) ? trimmed : null;
 }
 
 function parseDogAge(value: unknown) {
@@ -236,7 +248,7 @@ function normalizeExtraServiceIds(value: unknown) {
 }
 
 function getRequiredBoxes(dogCount: number) {
-  return Math.ceil(dogCount / bookingPricing.maxDogsPerBox);
+  return dogCount > 0 ? 1 : 0;
 }
 
 async function checkAvailability(
@@ -368,6 +380,8 @@ export async function POST(request: NextRequest) {
   const ownerSurname = String(body.ownerSurname).trim();
   const ownerEmail = String(body.email).trim().toLowerCase();
   const ownerPhone = normalizePhone(body.phone);
+  const expectedArrivalTime = normalizeOptionalTime(body.expectedArrivalTime);
+  const expectedPickupTime = normalizeOptionalTime(body.expectedPickupTime);
   const notes = normalizeOptionalString(body.notes);
   const stayType = getStayType(startDate, endDate);
 
@@ -441,6 +455,8 @@ export async function POST(request: NextRequest) {
       stay_type: stayType,
       start_date: startDate,
       end_date: endDate,
+      expected_arrival_time: expectedArrivalTime,
+      expected_pickup_time: expectedPickupTime,
       notes,
       admin_notes: null,
       confirmed_at: null,
@@ -522,6 +538,8 @@ export async function POST(request: NextRequest) {
         })),
         startDate,
         endDate,
+        expectedArrivalTime,
+        expectedPickupTime,
         stayType,
         source: "online",
         status: "pending",

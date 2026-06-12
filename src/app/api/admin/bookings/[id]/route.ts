@@ -76,6 +76,16 @@ function isValidDateKey(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function normalizeOptionalString(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function getStayType(startDate: string, endDate: string) {
   return startDate === endDate ? "day_care" : "overnight";
 }
@@ -227,6 +237,7 @@ export async function PATCH(
   let body: {
     status?: unknown;
     adminNotes?: unknown;
+    customerMessage?: unknown;
     startDate?: unknown;
     endDate?: unknown;
   };
@@ -385,6 +396,7 @@ export async function PATCH(
       startDate: data.start_date,
       endDate: data.end_date,
       status: data.status,
+      customerMessage: normalizeOptionalString(body.customerMessage),
     }).catch((emailError) => {
       console.error("Admin booking status email error:", emailError);
     });

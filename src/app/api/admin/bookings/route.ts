@@ -29,6 +29,8 @@ type ManualBookingBody = {
   ownerSurname?: unknown;
   email?: unknown;
   phone?: unknown;
+  expectedArrivalTime?: unknown;
+  expectedPickupTime?: unknown;
 
   dogs?: unknown;
   extraServiceIds?: unknown;
@@ -96,6 +98,8 @@ const adminBookingsSelect = `
   stay_type,
   start_date,
   end_date,
+  expected_arrival_time,
+  expected_pickup_time,
   notes,
   admin_notes,
   created_at,
@@ -175,6 +179,16 @@ function normalizeOptionalString(value: unknown) {
   const trimmed = value.trim();
 
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalTime(value: unknown) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return /^\d{2}:\d{2}$/.test(trimmed) ? trimmed : null;
 }
 
 function normalizeRequiredDbString(value: unknown) {
@@ -330,7 +344,7 @@ function normalizeExtraServiceIds(value: unknown) {
 }
 
 function getRequiredBoxes(dogCount: number) {
-  return Math.ceil(dogCount / bookingPricing.maxDogsPerBox);
+  return dogCount > 0 ? 1 : 0;
 }
 
 async function checkAvailability(
@@ -417,6 +431,10 @@ export async function GET() {
   const bookings = (data ?? []).map((booking) => ({
     ...booking,
     id: String(booking.id),
+    expected_arrival_time:
+      "expected_arrival_time" in booking ? booking.expected_arrival_time : null,
+    expected_pickup_time:
+      "expected_pickup_time" in booking ? booking.expected_pickup_time : null,
     box_count: "box_count" in booking ? booking.box_count : null,
     estimated_price_cents:
       "estimated_price_cents" in booking ? booking.estimated_price_cents : null,
@@ -558,6 +576,8 @@ export async function POST(request: NextRequest) {
       ? body.status
       : "confirmed";
   const extraServiceIds = normalizeExtraServiceIds(body.extraServiceIds);
+  const expectedArrivalTime = normalizeOptionalTime(body.expectedArrivalTime);
+  const expectedPickupTime = normalizeOptionalTime(body.expectedPickupTime);
   const estimate = calculateBookingEstimate({
     startDate,
     endDate,
@@ -637,6 +657,8 @@ export async function POST(request: NextRequest) {
       stay_type: getStayType(startDate, endDate),
       start_date: startDate,
       end_date: endDate,
+      expected_arrival_time: expectedArrivalTime,
+      expected_pickup_time: expectedPickupTime,
       notes: normalizeOptionalString(body.notes),
       admin_notes: normalizeOptionalString(body.adminNotes),
       confirmed_at: status === "confirmed" ? now : null,

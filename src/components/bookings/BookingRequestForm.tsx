@@ -128,6 +128,8 @@ export function BookingRequestForm({
       ownerSurname: String(formData.get("ownerSurname") ?? ""),
       email: String(formData.get("email") ?? ""),
       phone: String(formData.get("phone") ?? ""),
+      expectedArrivalTime: String(formData.get("expectedArrivalTime") ?? ""),
+      expectedPickupTime: String(formData.get("expectedPickupTime") ?? ""),
       dogs: payloadDogs,
       extraServiceIds: selectedExtraServiceIds,
       notes: String(formData.get("notes") ?? ""),
@@ -198,6 +200,19 @@ export function BookingRequestForm({
           />
           <SummaryItem label="Tipo permanenza" value={stayLabel} />
         </div>
+
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <Field
+            label="Orario previsto di arrivo"
+            name="expectedArrivalTime"
+            type="time"
+          />
+          <Field
+            label="Orario previsto di ritiro"
+            name="expectedPickupTime"
+            type="time"
+          />
+        </div>
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -226,7 +241,9 @@ export function BookingRequestForm({
           <div>
             <h2 className="text-xl font-bold text-slate-950">Dati cani</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Massimo {bookingPricing.maxDogsPerBox} cani nello stesso box.
+              Una prenotazione occupa sempre un solo box. Puoi inserire fino a{" "}
+              {bookingPricing.maxDogsPerBooking} cani compatibili dello stesso
+              nucleo.
             </p>
           </div>
 
@@ -452,14 +469,20 @@ function EstimatePanel({
 
       {!estimate.isComplete ? (
         <p className="mt-4 rounded-2xl bg-white p-3 text-sm font-semibold text-slate-700">
-          Seleziona la taglia di ogni cane per completare il preventivo.
+          Inserisci almeno un cane per completare il preventivo.
         </p>
       ) : (
         <div className="mt-5 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
           <EstimateRow
             label="Pensione"
-            value={formatEuro(estimate.baseSubtotalCents)}
+            value={formatEuro(estimate.baseBeforeDiscountsCents)}
           />
+          {estimate.overnightUnitRateCents !== null ? (
+            <EstimateRow
+              label={`Tariffa notturna ${estimate.overnightRateLabel}`}
+              value={`${formatEuro(estimate.overnightUnitRateCents)} / notte`}
+            />
+          ) : null}
           <EstimateRow
             label="Servizi extra"
             value={formatEuro(estimate.extrasSubtotalCents)}
@@ -468,12 +491,6 @@ function EstimatePanel({
             <EstimateRow
               label={`Sconto secondo cane ${bookingPricing.secondDogDiscountPercent}%`}
               value={`-${formatEuro(estimate.secondDogDiscountCents)}`}
-            />
-          ) : null}
-          {estimate.longStayDiscountCents > 0 ? (
-            <EstimateRow
-              label={`Sconto soggiorno lungo ${bookingPricing.longStayDiscountPercent}%`}
-              value={`-${formatEuro(estimate.longStayDiscountCents)}`}
             />
           ) : null}
         </div>

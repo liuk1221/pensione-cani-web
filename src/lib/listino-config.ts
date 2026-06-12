@@ -24,13 +24,14 @@ export type ExtraServiceId =
   | "local_transport";
 
 export type BookingPricingConfig = {
-  maxDogsPerBox: number;
   maxDogsPerBooking: number;
   secondDogDiscountPercent: number;
-  longStayMinNights: number;
-  longStayDiscountPercent: number;
   dayCareRateCents: number;
-  overnightRatesBySize: Record<DogSize, number>;
+  overnightRateTiers: Array<{
+    minNights: number;
+    label: string;
+    amountCents: number;
+  }>;
 };
 
 export type ListinoConfig = {
@@ -47,8 +48,8 @@ export const dailyRates: ListinoPriceRow[] = [
     id: "day_care",
     service: "Pensione giornaliera",
     details: "Ingresso mattina, uscita entro sera, area sgambamento inclusa",
-    price: "EUR 22",
-    amountCents: 2200,
+    price: "EUR 20",
+    amountCents: 2000,
     billingUnit: "per_day",
   },
   {
@@ -71,41 +72,36 @@ export const dailyRates: ListinoPriceRow[] = [
 
 export const overnightRates: ListinoPriceRow[] = [
   {
-    id: "overnight_small",
-    service: "Pensione notturna cane piccolo",
-    details: "Box dedicato, gestione quotidiana e area esterna",
+    id: "overnight_1_3",
+    service: "Pensione notturna 1-3 notti",
+    details: "Tariffa per soggiorni brevi consecutivi, box dedicato e gestione quotidiana",
     price: "EUR 28 / notte",
     amountCents: 2800,
     billingUnit: "per_night",
-    dogSize: "small",
   },
   {
-    id: "overnight_medium",
-    service: "Pensione notturna cane medio",
-    details: "Box dedicato, gestione quotidiana e area esterna",
-    price: "EUR 32 / notte",
-    amountCents: 3200,
+    id: "overnight_4_6",
+    service: "Pensione notturna 4-6 notti",
+    details: "Tariffa ridotta per soggiorni consecutivi di media durata",
+    price: "EUR 25 / notte",
+    amountCents: 2500,
     billingUnit: "per_night",
-    dogSize: "medium",
   },
   {
-    id: "overnight_large",
-    service: "Pensione notturna cane grande",
-    details: "Box dedicato, gestione quotidiana e area esterna",
-    price: "EUR 36 / notte",
-    amountCents: 3600,
+    id: "overnight_7_13",
+    service: "Pensione notturna 7-13 notti",
+    details: "Tariffa ridotta per una settimana o piu di permanenza continuativa",
+    price: "EUR 22 / notte",
+    amountCents: 2200,
     billingUnit: "per_night",
-    dogSize: "large",
   },
   {
-    id: "overnight_giant",
-    service: "Cane gigante o gestione speciale",
-    details: "Per soggetti molto grandi o con necessita di routine dedicate",
-    price: "Da EUR 40 / notte",
-    amountCents: 4000,
+    id: "overnight_14_plus",
+    service: "Pensione notturna 14+ notti",
+    details: "Tariffa piu conveniente per soggiorni lunghi consecutivi",
+    price: "EUR 20 / notte",
+    amountCents: 2000,
     billingUnit: "per_night",
-    dogSize: "giant",
-    estimateLabel: "Stima calcolata dalla tariffa minima",
   },
 ];
 
@@ -150,13 +146,13 @@ export const promotions: ListinoPromotion[] = [
   {
     name: "Box condiviso famiglia",
     condition:
-      "Due cani dello stesso proprietario, gia abituati a stare insieme e compatibili in box.",
-    benefit: "-20% sul secondo cane",
+      "Due cani dello stesso proprietario, gia abituati a stare insieme e compatibili nello stesso box.",
+    benefit: "-50% sul secondo cane",
   },
   {
-    name: "Soggiorni lunghi",
-    condition: "Permanenze continuative superiori a 5 notti.",
-    benefit: "-10% sul totale pensione",
+    name: "Tariffa progressiva",
+    condition: "Permanenze notturne continuative nello stesso soggiorno.",
+    benefit: "Prezzo per notte decrescente",
   },
   {
     name: "Inserimento cuccioli",
@@ -167,8 +163,8 @@ export const promotions: ListinoPromotion[] = [
 ];
 
 export const conditions: string[] = [
-  "Le tariffe sono indicative e possono variare in base a taglia, periodo, durata del soggiorno e necessita specifiche del cane.",
-  "La condivisione del box e possibile solo per cani che si conoscono, compatibili tra loro e appartenenti allo stesso nucleo familiare. La struttura puo interrompere la condivisione se non la ritiene sicura.",
+  "Le tariffe sono indicative e possono variare in base a periodo, durata del soggiorno e necessita specifiche del cane.",
+  "Ogni prenotazione occupa un solo box. Piu cani possono stare nella stessa prenotazione solo se compatibili tra loro e appartenenti allo stesso nucleo familiare.",
   "Per soggiorni notturni il giorno di uscita non viene conteggiato come notte, salvo permanenza prolungata oltre l'orario concordato.",
   "Il cibo portato dal proprietario deve essere porzionato o accompagnato da indicazioni chiare sulle quantita giornaliere.",
   "Farmaci, integratori e terapie vengono somministrati solo con istruzioni scritte e confezioni riconoscibili.",
@@ -177,18 +173,15 @@ export const conditions: string[] = [
 ];
 
 export const bookingPricing: BookingPricingConfig = {
-  maxDogsPerBox: 2,
   maxDogsPerBooking: 2,
-  secondDogDiscountPercent: 20,
-  longStayMinNights: 6,
-  longStayDiscountPercent: 10,
-  dayCareRateCents: 2200,
-  overnightRatesBySize: {
-    small: 2800,
-    medium: 3200,
-    large: 3600,
-    giant: 4000,
-  },
+  secondDogDiscountPercent: 50,
+  dayCareRateCents: 2000,
+  overnightRateTiers: [
+    { minNights: 1, label: "1-3 notti", amountCents: 2800 },
+    { minNights: 4, label: "4-6 notti", amountCents: 2500 },
+    { minNights: 7, label: "7-13 notti", amountCents: 2200 },
+    { minNights: 14, label: "14+ notti", amountCents: 2000 },
+  ],
 };
 
 export const listinoConfig: ListinoConfig = {

@@ -11,6 +11,7 @@ type BookingEmailPayload = {
   startDate: string;
   endDate: string;
   status: BookingEmailStatus;
+  customerMessage?: string | null;
 };
 
 type BookingAdminNotificationPayload = {
@@ -37,6 +38,8 @@ type BookingAdminNotificationPayload = {
   }>;
   startDate: string;
   endDate: string;
+  expectedArrivalTime?: string | null;
+  expectedPickupTime?: string | null;
   stayType: string;
   source: string;
   status: string;
@@ -111,6 +114,14 @@ function formatDateTime(value: string | null) {
 
 function getOptionalText(value: string | null | undefined) {
   return value && value.trim().length > 0 ? value : "Non indicato";
+}
+
+function getOptionalTime(value: string | null | undefined) {
+  return value && value.trim().length > 0 ? value.slice(0, 5) : "Non indicato";
+}
+
+function escapeHtmlWithLineBreaks(value: string) {
+  return escapeHtml(value).replace(/\r?\n/g, "<br>");
 }
 
 function getDogSizeLabel(size: string) {
@@ -259,6 +270,7 @@ function getEmailHtml(payload: BookingEmailPayload) {
   const replyTo = escapeHtml(getEmailReplyTo());
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   const safeSiteUrl = siteUrl ? escapeHtml(siteUrl) : "";
+  const customerMessage = payload.customerMessage?.trim();
 
   return `<!doctype html>
 <html lang="it">
@@ -308,6 +320,18 @@ function getEmailHtml(payload: BookingEmailPayload) {
                 </table>
               </td>
             </tr>
+            ${
+              customerMessage
+                ? `<tr>
+              <td style="padding:6px 28px 12px;">
+                <div style="border:1px solid #e2e8f0;border-radius:18px;background:#ffffff;padding:18px 20px;text-align:left;">
+                  <div style="color:#64748b;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;">Messaggio dalla struttura</div>
+                  <div style="margin-top:8px;color:#0f172a;font-size:15px;line-height:1.7;">${escapeHtmlWithLineBreaks(customerMessage)}</div>
+                </div>
+              </td>
+            </tr>`
+                : ""
+            }
             <tr>
               <td style="padding:18px 28px 34px;text-align:center;">
                 <p style="margin:0 auto;max-width:520px;color:#64748b;font-size:14px;line-height:1.6;">
@@ -339,6 +363,13 @@ function getEmailText(payload: BookingEmailPayload) {
     "",
     `Cane: ${payload.dogName}`,
     `Periodo: ${getDateSummary(payload.startDate, payload.endDate)}`,
+    ...(payload.customerMessage?.trim()
+      ? [
+          "",
+          "Messaggio dalla struttura:",
+          payload.customerMessage.trim(),
+        ]
+      : []),
     "",
     `Per domande puoi scrivere a ${getEmailReplyTo()} o agli altri contatti disponibili sul sito.`,
   ].join("\n");
@@ -489,6 +520,8 @@ function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
                   { label: "Stato", value: getStatusLabel(payload.status) },
                   { label: "Tipologia", value: getStayTypeLabel(payload.stayType) },
                   { label: "Periodo", value: getDateSummary(payload.startDate, payload.endDate) },
+                  { label: "Orario previsto di arrivo", value: getOptionalTime(payload.expectedArrivalTime) },
+                  { label: "Orario previsto di ritiro", value: getOptionalTime(payload.expectedPickupTime) },
                   { label: "Note cliente", value: getOptionalText(payload.notes) },
                 ])}
                 ${getAdminDetailSection("Proprietario", [
@@ -531,6 +564,8 @@ function getAdminNotificationText(payload: BookingAdminNotificationPayload) {
     `Stato: ${getStatusLabel(payload.status)}`,
     `Tipologia: ${getStayTypeLabel(payload.stayType)}`,
     `Periodo: ${getDateSummary(payload.startDate, payload.endDate)}`,
+    `Orario previsto di arrivo: ${getOptionalTime(payload.expectedArrivalTime)}`,
+    `Orario previsto di ritiro: ${getOptionalTime(payload.expectedPickupTime)}`,
     `Note cliente: ${getOptionalText(payload.notes)}`,
     "",
     "Proprietario",

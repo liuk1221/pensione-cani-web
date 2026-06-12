@@ -41,6 +41,8 @@ type Booking = {
   stay_type: "day_care" | "overnight";
   start_date: string;
   end_date: string;
+  expected_arrival_time: string | null;
+  expected_pickup_time: string | null;
   notes: string | null;
   admin_notes: string | null;
   created_at: string;
@@ -76,6 +78,11 @@ type ActionResponse = BaseApiResponse & {
   unavailableDays?: string[];
 };
 
+type StatusAction = {
+  booking: Booking;
+  status: Extract<BookingStatus, "confirmed" | "rejected" | "completed">;
+};
+
 const statusLabels: Record<BookingStatus, string> = {
   pending: "In attesa",
   confirmed: "Confermata",
@@ -98,6 +105,24 @@ const statusClasses: Record<BookingStatus, string> = {
   completed: "bg-blue-100 text-blue-900",
 };
 
+const customerMessageLabels: Record<StatusAction["status"], string> = {
+  confirmed: "Informazioni dopo la conferma",
+  rejected: "Motivo del rifiuto",
+  completed: "Informazioni post completamento",
+};
+
+const statusActionDialogTitles: Record<StatusAction["status"], string> = {
+  confirmed: "Confermare prenotazione",
+  rejected: "Rifiutare prenotazione",
+  completed: "Completare prenotazione",
+};
+
+const statusActionConfirmLabels: Record<StatusAction["status"], string> = {
+  confirmed: "Conferma",
+  rejected: "Rifiuta",
+  completed: "Completa",
+};
+
 function formatDateKey(date: string) {
   const [year, month, day] = date.split("-");
   return `${day}/${month}/${year}`;
@@ -112,6 +137,10 @@ function formatEuro(cents: number) {
 
 function formatDateList(dates: string[]) {
   return dates.map(formatDateKey).join(", ");
+}
+
+function formatTime(value: string | null) {
+  return value ? value.slice(0, 5) : "Non indicato";
 }
 
 function isValidDateKey(value: string) {
@@ -255,6 +284,9 @@ export default function AdminPrenotazioniPage() {
   const [availabilityWarning, setAvailabilityWarning] = useState<
     string[] | null
   >(null);
+  const [pendingStatusAction, setPendingStatusAction] =
+    useState<StatusAction | null>(null);
+  const [customerMessage, setCustomerMessage] = useState("");
   const [bookingPendingDeletion, setBookingPendingDeletion] =
     useState<Booking | null>(null);
 
@@ -337,7 +369,11 @@ export default function AdminPrenotazioniPage() {
     }
   }
 
-  async function updateBookingStatus(id: string, status: BookingStatus) {
+  async function updateBookingStatus(
+    id: string,
+    status: BookingStatus,
+    messageToCustomer = "",
+  ) {
     const currentBooking = bookings.find((booking) => booking.id === id);
 
     if (!currentBooking) {
@@ -375,6 +411,7 @@ export default function AdminPrenotazioniPage() {
         body: JSON.stringify({
           status,
           adminNotes: adminNotesById[id] ?? "",
+          customerMessage: messageToCustomer,
           ...(status === "confirmed"
             ? {
                 startDate: dateEdit.startDate,
@@ -449,6 +486,28 @@ export default function AdminPrenotazioniPage() {
     } finally {
       setUpdatingId(null);
     }
+  }
+
+  function openStatusActionDialog(
+    booking: Booking,
+    status: StatusAction["status"],
+  ) {
+    setPendingStatusAction({ booking, status });
+    setCustomerMessage("");
+  }
+
+  async function confirmPendingStatusAction() {
+    if (!pendingStatusAction) {
+      return;
+    }
+
+    const { booking, status } = pendingStatusAction;
+    const message = customerMessage;
+
+    setPendingStatusAction(null);
+    setCustomerMessage("");
+
+    await updateBookingStatus(booking.id, status, message);
   }
 
   async function deleteBooking(booking: Booking) {
@@ -1013,7 +1072,7 @@ export default function AdminPrenotazioniPage() {
                                 <button
                                 type="button"
                                 disabled={isUpdating}
-                                onClick={() => void updateBookingStatus(booking.id, "confirmed")}
+                                onClick={() => openStatusActionDialog(booking, "confirmed")}
                                 className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-green-200 bg-green-50 px-5 py-2 text-sm font-bold text-green-800 transition hover:border-green-300 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                 Conferma
@@ -1022,7 +1081,7 @@ export default function AdminPrenotazioniPage() {
                                 <button
                                 type="button"
                                 disabled={isUpdating}
-                                onClick={() => void updateBookingStatus(booking.id, "rejected")}
+                                onClick={() => openStatusActionDialog(booking, "rejected")}
                                 className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-red-200 bg-red-50 px-5 py-2 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                 Rifiuta
@@ -1033,7 +1092,7 @@ export default function AdminPrenotazioniPage() {
                                 <button
                                 type="button"
                                 disabled={isUpdating}
-                                onClick={() => void updateBookingStatus(booking.id, "completed")}
+                                onClick={() => openStatusActionDialog(booking, "completed")}
                                 className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                 Completa
@@ -1078,6 +1137,14 @@ export default function AdminPrenotazioniPage() {
 
                     <p className="text-sm text-slate-600">
                       Uscita: {formatDateKey(booking.end_date)}
+                    </p>
+
+                    <p className="mt-3 text-sm text-slate-600">
+                      Orario arrivo: {formatTime(booking.expected_arrival_time)}
+                    </p>
+
+                    <p className="text-sm text-slate-600">
+                      Orario ritiro: {formatTime(booking.expected_pickup_time)}
                     </p>
 
                     {booking.status === "pending" ? (
@@ -1165,7 +1232,7 @@ export default function AdminPrenotazioniPage() {
                     </div>
 
                     <p className="mt-3 text-xs font-semibold text-slate-500">
-                      Box richiesti: {booking.box_count ?? 1}
+                      Box prenotazione: 1
                     </p>
                   </div>
                 </div>
@@ -1252,6 +1319,51 @@ export default function AdminPrenotazioniPage() {
         <p className="mt-3">
           La prenotazione resta tra le richieste in attesa.
         </p>
+      </ResponsiveDialog>
+
+      <ResponsiveDialog
+        isOpen={pendingStatusAction !== null}
+        title={
+          pendingStatusAction
+            ? statusActionDialogTitles[pendingStatusAction.status]
+            : "Aggiorna prenotazione"
+        }
+        confirmLabel={
+          pendingStatusAction
+            ? statusActionConfirmLabels[pendingStatusAction.status]
+            : "Conferma"
+        }
+        cancelLabel="Annulla"
+        tone={pendingStatusAction?.status === "rejected" ? "danger" : "default"}
+        onClose={() => {
+          setPendingStatusAction(null);
+          setCustomerMessage("");
+        }}
+        onConfirm={() => {
+          void confirmPendingStatusAction();
+        }}
+      >
+        <p>
+          {pendingStatusAction
+            ? `Vuoi segnare la prenotazione di ${getBookingDogNames(
+                pendingStatusAction.booking,
+              )} come ${statusLabels[pendingStatusAction.status].toLowerCase()}?`
+            : ""}
+        </p>
+
+        <label className="mt-5 block text-sm font-bold text-slate-800">
+          {pendingStatusAction
+            ? customerMessageLabels[pendingStatusAction.status]
+            : "Messaggio al cliente"}
+        </label>
+
+        <textarea
+          value={customerMessage}
+          onChange={(event) => setCustomerMessage(event.target.value)}
+          rows={5}
+          placeholder="Testo opzionale da inserire nell'email al cliente..."
+          className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+        />
       </ResponsiveDialog>
 
       <ResponsiveDialog

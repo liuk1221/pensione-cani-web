@@ -63,6 +63,8 @@ export function ManualBookingForm({
       ownerSurname: String(formData.get("ownerSurname") ?? ""),
       email: String(formData.get("email") ?? ""),
       phone: String(formData.get("phone") ?? ""),
+      expectedArrivalTime: String(formData.get("expectedArrivalTime") ?? ""),
+      expectedPickupTime: String(formData.get("expectedPickupTime") ?? ""),
 
       dogName: String(formData.get("dogName") ?? ""),
       dogBreed: String(formData.get("dogBreed") ?? ""),
@@ -215,6 +217,25 @@ export function ManualBookingForm({
             Email e telefono sono facoltativi per le prenotazioni inserite
             manualmente dall’admin.
           </p>
+        </div>
+
+        <div className="rounded-3xl bg-slate-50 p-5">
+          <h3 className="text-lg font-bold text-slate-950">
+            Orari previsti
+          </h3>
+
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <Field
+              label="Orario previsto di arrivo"
+              name="expectedArrivalTime"
+              type="time"
+            />
+            <Field
+              label="Orario previsto di ritiro"
+              name="expectedPickupTime"
+              type="time"
+            />
+          </div>
         </div>
 
         <div className="rounded-3xl bg-slate-50 p-5">
