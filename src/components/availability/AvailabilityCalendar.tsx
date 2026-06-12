@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toDateKey } from "@/lib/date-utils";
+import { formatDateKey, toDateKey } from "@/lib/date-utils";
 
 export type DayAvailabilityStatus =
   | "available"
@@ -246,7 +246,7 @@ export function AvailabilityCalendar({
               key={dateKey}
               type="button"
               disabled={!isClickable}
-              aria-label={`${date.getDate()} ${monthNames[month]} ${year}: ${getStatusLabel(
+              aria-label={`${formatDateKey(dateKey)}: ${getStatusLabel(
                 status,
               )}${
                 availability && status !== "closed" && status !== "past"

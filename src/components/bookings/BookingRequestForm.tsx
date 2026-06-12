@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatDateKey } from "@/lib/date-utils";
 
 type BookingRequestFormProps = {
   startDate: string | null;
@@ -113,14 +114,14 @@ export function BookingRequestForm({
           <div>
             <p className="font-semibold text-slate-700">Arrivo</p>
             <p className="mt-1 text-slate-500">
-              {startDate ?? "Non selezionato"}
+              {startDate ? formatDateKey(startDate) : "Non selezionato"}
             </p>
           </div>
 
           <div>
             <p className="font-semibold text-slate-700">Uscita</p>
             <p className="mt-1 text-slate-500">
-              {endDate ?? "Non selezionato"}
+              {endDate ? formatDateKey(endDate) : "Non selezionato"}
             </p>
           </div>
 

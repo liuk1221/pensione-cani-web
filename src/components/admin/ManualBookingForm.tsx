@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { formatDateKey } from "@/lib/date-utils";
 
 type ManualBookingFormProps = {
   startDate: string;
@@ -138,12 +139,12 @@ export function ManualBookingForm({
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
             <p className="font-semibold">Arrivo</p>
-            <p>{startDate}</p>
+            <p>{formatDateKey(startDate)}</p>
           </div>
 
           <div>
             <p className="font-semibold">Uscita</p>
-            <p>{endDate}</p>
+            <p>{formatDateKey(endDate)}</p>
           </div>
 
           <div>

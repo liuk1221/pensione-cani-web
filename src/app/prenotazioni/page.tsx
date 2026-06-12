@@ -8,6 +8,7 @@ import {
 import { BookingRequestForm } from "@/components/bookings/BookingRequestForm";
 import {
   compareDateKeys,
+  formatDateKey,
   getDateKeysInRange,
   toDateKey,
 } from "@/lib/date-utils";
@@ -166,7 +167,12 @@ export default function PrenotazioniPage() {
       return true;
     }
 
-    if (!selectedStartDate || selectedEndDate) {
+    const hasCompletedRange =
+      selectedStartDate &&
+      selectedEndDate &&
+      selectedStartDate !== selectedEndDate;
+
+    if (!selectedStartDate || hasCompletedRange) {
       return !hasAvailableDate(date);
     }
 
@@ -184,7 +190,12 @@ export default function PrenotazioniPage() {
   function handleDayClick(date: string) {
     setSelectionError(null);
 
-    if (!selectedStartDate || selectedEndDate) {
+    const hasCompletedRange =
+      selectedStartDate &&
+      selectedEndDate &&
+      selectedStartDate !== selectedEndDate;
+
+    if (!selectedStartDate || hasCompletedRange) {
       if (!hasAvailableDate(date)) {
         setSelectionError(
           "La data di arrivo deve avere almeno uno slot libero.",
@@ -193,7 +204,7 @@ export default function PrenotazioniPage() {
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(null);
+      setSelectedEndDate(date);
       return;
     }
 
@@ -206,7 +217,7 @@ export default function PrenotazioniPage() {
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(null);
+      setSelectedEndDate(date);
       return;
     }
 
@@ -214,7 +225,7 @@ export default function PrenotazioniPage() {
 
     if (unavailableDate) {
       setSelectionError(
-        `L’intervallo contiene una data non disponibile: ${unavailableDate}.`,
+        "Intervallo non disponibile: " + formatDateKey(unavailableDate) + ".",
       );
       return;
     }
@@ -271,9 +282,9 @@ export default function PrenotazioniPage() {
           </h1>
 
           <p className="mt-4 text-slate-600">
-            Seleziona arrivo e uscita. Se arrivo e uscita coincidono, la
-            richiesta viene considerata senza pernottamento. In caso di
-            pernottamento, il giorno di uscita non occupa il box.
+            Tocca un giorno per selezionarlo come arrivo e uscita. Con un
+            secondo tocco puoi impostare l&apos;uscita e creare un intervallo. In
+            caso di pernottamento, il giorno di uscita non occupa il box.
           </p>
         </div>
 
@@ -319,14 +330,18 @@ export default function PrenotazioniPage() {
             <div>
               <p className="font-semibold text-slate-700">Arrivo</p>
               <p className="mt-1 text-slate-500">
-                {selectedStartDate ?? "Non selezionato"}
+                {selectedStartDate
+                  ? formatDateKey(selectedStartDate)
+                  : "Non selezionato"}
               </p>
             </div>
 
             <div>
               <p className="font-semibold text-slate-700">Uscita</p>
               <p className="mt-1 text-slate-500">
-                {selectedEndDate ?? "Non selezionato"}
+                {selectedEndDate
+                  ? formatDateKey(selectedEndDate)
+                  : "Non selezionato"}
               </p>
             </div>
 

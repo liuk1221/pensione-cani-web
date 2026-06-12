@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 
 type BookingStatus =
   | "pending"
@@ -200,6 +201,11 @@ export default function AdminPrenotazioniPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [availabilityWarning, setAvailabilityWarning] = useState<
+    string[] | null
+  >(null);
+  const [bookingPendingDeletion, setBookingPendingDeletion] =
+    useState<Booking | null>(null);
 
   const todayKey = getTodayDateKey();
 
@@ -331,11 +337,7 @@ export default function AdminPrenotazioniPage() {
 
       if (!response.ok) {
         if (status === "confirmed" && payload.unavailableDays?.length) {
-          window.alert(
-            `Impossibile confermare la prenotazione.\n\nGiorni senza disponibilita: ${formatDateList(
-              payload.unavailableDays,
-            )}\n\nLa prenotazione resta tra le richieste in attesa.`,
-          );
+          setAvailabilityWarning(payload.unavailableDays);
         }
 
         throw new Error(
@@ -399,15 +401,8 @@ export default function AdminPrenotazioniPage() {
   }
 
   async function deleteBooking(booking: Booking) {
-    const confirmed = window.confirm(
-      `Vuoi eliminare definitivamente la prenotazione di ${booking.dog.name}? Questa azione non può essere annullata.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
+      setBookingPendingDeletion(null);
       setUpdatingId(booking.id);
       setError(null);
       setSuccessMessage(null);
@@ -1005,7 +1000,7 @@ export default function AdminPrenotazioniPage() {
                             <button
                             type="button"
                             disabled={isUpdating}
-                            onClick={() => void deleteBooking(booking)}
+                            onClick={() => setBookingPendingDeletion(booking)}
                             className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-red-200 bg-red-50 px-5 py-2 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                             Elimina dal DB
@@ -1153,6 +1148,54 @@ export default function AdminPrenotazioniPage() {
           })}
         </div>
       )}
+
+      <ResponsiveDialog
+        isOpen={availabilityWarning !== null}
+        title="Impossibile confermare"
+        confirmLabel="Ho capito"
+        cancelLabel="Chiudi"
+        onClose={() => setAvailabilityWarning(null)}
+      >
+        <p>
+          Nei giorni indicati non c&apos;e disponibilita:{" "}
+          <span className="font-bold text-slate-900">
+            {availabilityWarning ? formatDateList(availabilityWarning) : ""}
+          </span>
+          .
+        </p>
+        <p className="mt-3">
+          La prenotazione resta tra le richieste in attesa.
+        </p>
+      </ResponsiveDialog>
+
+      <ResponsiveDialog
+        isOpen={bookingPendingDeletion !== null}
+        title="Eliminare la prenotazione?"
+        confirmLabel="Elimina definitivamente"
+        cancelLabel="Annulla"
+        isConfirming={
+          bookingPendingDeletion !== null &&
+          updatingId === bookingPendingDeletion.id
+        }
+        tone="danger"
+        onClose={() => setBookingPendingDeletion(null)}
+        onConfirm={() => {
+          if (bookingPendingDeletion) {
+            void deleteBooking(bookingPendingDeletion);
+          }
+        }}
+      >
+        <p>
+          Vuoi eliminare definitivamente la prenotazione di{" "}
+          <span className="font-bold text-slate-900">
+            {bookingPendingDeletion?.dog.name}
+          </span>
+          ?
+        </p>
+        <p className="mt-3 font-semibold text-red-700">
+          Questa azione non puo essere annullata.
+        </p>
+      </ResponsiveDialog>
     </section>
   );
 }

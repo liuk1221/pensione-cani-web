@@ -11,6 +11,16 @@ export function fromDateKey(dateKey: string) {
   return new Date(year, month - 1, day);
 }
 
+export function formatDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-");
+
+  if (!year || !month || !day) {
+    return dateKey;
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
 export function compareDateKeys(a: string, b: string) {
   return a.localeCompare(b);
 }

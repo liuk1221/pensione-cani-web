@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { formatDateKey } from "@/lib/date-utils";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 
 type Settings = {
   id: number;
@@ -31,6 +33,13 @@ export default function AdminDisponibilitaPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [deletingAvailabilityId, setDeletingAvailabilityId] = useState<
+    string | null
+  >(null);
+  const [closedDayPendingDeletion, setClosedDayPendingDeletion] =
+    useState<ClosedDay | null>(null);
+  const [overridePendingDeletion, setOverridePendingDeletion] =
+    useState<AvailabilityOverride | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -218,6 +227,8 @@ export default function AdminDisponibilitaPage() {
 
   async function deleteClosedDay(id: string) {
     try {
+      setClosedDayPendingDeletion(null);
+      setDeletingAvailabilityId(id);
       setError(null);
       setSuccessMessage(null);
 
@@ -239,11 +250,15 @@ export default function AdminDisponibilitaPage() {
           ? error.message
           : "Errore eliminazione giorno chiuso.",
       );
+    } finally {
+      setDeletingAvailabilityId(null);
     }
   }
 
   async function deleteOverride(id: string) {
     try {
+      setOverridePendingDeletion(null);
+      setDeletingAvailabilityId(id);
       setError(null);
       setSuccessMessage(null);
 
@@ -265,6 +280,8 @@ export default function AdminDisponibilitaPage() {
           ? error.message
           : "Errore eliminazione blocco manuale.",
       );
+    } finally {
+      setDeletingAvailabilityId(null);
     }
   }
 
@@ -537,7 +554,9 @@ export default function AdminDisponibilitaPage() {
                       className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4"
                     >
                       <div>
-                        <p className="font-bold text-slate-950">{item.date}</p>
+                        <p className="font-bold text-slate-950">
+                          {formatDateKey(item.date)}
+                        </p>
                         <p className="text-sm text-slate-500">
                           {item.reason ?? "Nessun motivo indicato"}
                         </p>
@@ -545,8 +564,9 @@ export default function AdminDisponibilitaPage() {
 
                       <button
                         type="button"
-                        onClick={() => deleteClosedDay(item.id)}
-                        className="rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-red-500"
+                        disabled={deletingAvailabilityId === item.id}
+                        onClick={() => setClosedDayPendingDeletion(item)}
+                        className="rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Elimina
                       </button>
@@ -573,7 +593,9 @@ export default function AdminDisponibilitaPage() {
                       className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4"
                     >
                       <div>
-                        <p className="font-bold text-slate-950">{item.date}</p>
+                        <p className="font-bold text-slate-950">
+                          {formatDateKey(item.date)}
+                        </p>
                         <p className="text-sm text-slate-600">
                           Box bloccati: {item.blocked_boxes}
                         </p>
@@ -584,8 +606,9 @@ export default function AdminDisponibilitaPage() {
 
                       <button
                         type="button"
-                        onClick={() => deleteOverride(item.id)}
-                        className="rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-red-500"
+                        disabled={deletingAvailabilityId === item.id}
+                        onClick={() => setOverridePendingDeletion(item)}
+                        className="rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Elimina
                       </button>
@@ -597,6 +620,58 @@ export default function AdminDisponibilitaPage() {
           </div>
         </div>
       )}
+
+      <ResponsiveDialog
+        isOpen={closedDayPendingDeletion !== null}
+        title="Eliminare il giorno chiuso?"
+        confirmLabel="Elimina"
+        cancelLabel="Annulla"
+        isConfirming={
+          closedDayPendingDeletion !== null &&
+          deletingAvailabilityId === closedDayPendingDeletion.id
+        }
+        tone="danger"
+        onClose={() => setClosedDayPendingDeletion(null)}
+        onConfirm={() => {
+          if (closedDayPendingDeletion) {
+            void deleteClosedDay(closedDayPendingDeletion.id);
+          }
+        }}
+      >
+        <p>
+          Vuoi eliminare il giorno chiuso del{" "}
+          <span className="font-bold text-slate-900">
+            {closedDayPendingDeletion?.date}
+          </span>
+          ?
+        </p>
+      </ResponsiveDialog>
+
+      <ResponsiveDialog
+        isOpen={overridePendingDeletion !== null}
+        title="Eliminare il blocco manuale?"
+        confirmLabel="Elimina"
+        cancelLabel="Annulla"
+        isConfirming={
+          overridePendingDeletion !== null &&
+          deletingAvailabilityId === overridePendingDeletion.id
+        }
+        tone="danger"
+        onClose={() => setOverridePendingDeletion(null)}
+        onConfirm={() => {
+          if (overridePendingDeletion) {
+            void deleteOverride(overridePendingDeletion.id);
+          }
+        }}
+      >
+        <p>
+          Vuoi eliminare il blocco manuale del{" "}
+          <span className="font-bold text-slate-900">
+            {overridePendingDeletion?.date}
+          </span>
+          ?
+        </p>
+      </ResponsiveDialog>
     </section>
   );
 }
