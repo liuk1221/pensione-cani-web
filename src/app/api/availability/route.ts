@@ -1,22 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-
-type AvailabilityRow = {
-  day: string;
-  total_boxes: number;
-  occupied_boxes: number;
-  blocked_boxes: number;
-  available_boxes: number;
-  status: "available" | "limited" | "full" | "closed";
-};
-
-function isValidDateKey(value: string | null) {
-  if (!value) {
-    return false;
-  }
-
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
+import { getPublicAvailability, isValidDateKey } from "@/lib/availability";
 
 export async function GET(request: NextRequest) {
   const from = request.nextUrl.searchParams.get("from");
@@ -32,39 +15,21 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { data, error } = await supabaseAdmin.rpc("get_public_availability", {
-    from_date: from,
-    to_date: to,
-  });
+  try {
+    const availabilityByDate = await getPublicAvailability(from, to);
 
-  if (error) {
+    return NextResponse.json({
+      availabilityByDate,
+    });
+  } catch (error) {
     console.error("Availability API error:", error);
 
     return NextResponse.json(
       {
-        error: "Errore durante il caricamento della disponibilità.",
-        details: error.message,
+        error: "Errore durante il caricamento della disponibilita.",
+        details: error instanceof Error ? error.message : undefined,
       },
       { status: 500 },
     );
   }
-
-  const rows = (data ?? []) as AvailabilityRow[];
-
-  const availabilityByDate = Object.fromEntries(
-    rows.map((row) => [
-      row.day,
-      {
-        date: row.day,
-        totalBoxes: row.total_boxes,
-        occupiedBoxes: row.occupied_boxes + row.blocked_boxes,
-        availableBoxes: row.available_boxes,
-        status: row.status,
-      },
-    ]),
-  );
-
-  return NextResponse.json({
-    availabilityByDate,
-  });
 }

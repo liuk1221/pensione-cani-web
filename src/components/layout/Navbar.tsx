@@ -59,11 +59,11 @@ export function Navbar() {
         <Link href={isAdminArea ? "/admin" : "/"} className="flex items-center gap-3">
           <div className="relative h-10 w-10 overflow-hidden rounded-full bg-blue-900">
             <Image
-              src="/images/LogoPirellaPetResort.png"
+              src="/images/logo-pirella-pet-resort-128.png"
               alt={`${siteConfig.name} logo`}
               fill
               className="object-cover"
-              priority
+              sizes="40px"
             />
           </div>
 

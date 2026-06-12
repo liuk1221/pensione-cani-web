@@ -2,22 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { formatDateKey, toDateKey } from "@/lib/date-utils";
-
-export type DayAvailabilityStatus =
-  | "available"
-  | "limited"
-  | "full"
-  | "closed"
-  | "unknown"
-  | "past";
-
-export type DayAvailability = {
-  date: string;
-  totalBoxes: number;
-  occupiedBoxes: number;
-  availableBoxes: number;
-  status: DayAvailabilityStatus;
-};
+import type {
+  DayAvailability,
+  DayAvailabilityStatus,
+} from "@/lib/availability-types";
 
 type AvailabilityCalendarMode = "public" | "booking" | "admin";
 

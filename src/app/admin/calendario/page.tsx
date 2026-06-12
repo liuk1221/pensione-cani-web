@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  AvailabilityCalendar,
-  DayAvailability,
-} from "@/components/availability/AvailabilityCalendar";
+import { AvailabilityCalendar } from "@/components/availability/AvailabilityCalendar";
 import { ManualBookingForm } from "@/components/admin/ManualBookingForm";
+import type { DayAvailability } from "@/lib/availability-types";
 import {
   compareDateKeys,
   formatDateKey,
