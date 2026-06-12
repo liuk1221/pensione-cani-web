@@ -12,6 +12,28 @@ type BookingStatus =
 
 type BookingSource = "online" | "phone" | "admin";
 
+type BookingDog = {
+  id: string;
+  name: string;
+  breed: string | null;
+  size: string;
+  age: number | null;
+  sex: string | null;
+  sterilized: boolean | null;
+};
+
+type BookingDogLink = {
+  position: number;
+  dog: BookingDog | BookingDog[] | null;
+};
+
+type SelectedExtraService = {
+  id: string;
+  service: string;
+  amountCents: number;
+  billingUnit: string;
+};
+
 type Booking = {
   id: string;
   source: BookingSource;
@@ -26,6 +48,9 @@ type Booking = {
   confirmed_at: string | null;
   rejected_at: string | null;
   cancelled_at: string | null;
+  box_count: number | null;
+  estimated_price_cents: number | null;
+  selected_extra_services: SelectedExtraService[] | null;
   customer: {
     id: string;
     first_name: string;
@@ -33,15 +58,8 @@ type Booking = {
     email: string;
     phone: string;
   };
-  dog: {
-    id: string;
-    name: string;
-    breed: string | null;
-    size: string;
-    age: number | null;
-    sex: string | null;
-    sterilized: boolean | null;
-  };
+  dog: BookingDog;
+  booking_dogs: BookingDogLink[] | null;
 };
 
 type BaseApiResponse = {
@@ -85,6 +103,13 @@ function formatDateKey(date: string) {
   return `${day}/${month}/${year}`;
 }
 
+function formatEuro(cents: number) {
+  return new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+  }).format(cents / 100);
+}
+
 function formatDateList(dates: string[]) {
   return dates.map(formatDateKey).join(", ");
 }
@@ -113,6 +138,32 @@ function getStayLabel(booking: Booking) {
     : "Con pernottamento";
 }
 
+function getSingleDog(dog: BookingDog | BookingDog[] | null) {
+  return Array.isArray(dog) ? (dog[0] ?? null) : dog;
+}
+
+function getBookingDogs(booking: Booking) {
+  const linkedDogs =
+    booking.booking_dogs
+      ?.map((link) => ({
+        position: link.position,
+        dog: getSingleDog(link.dog),
+      }))
+      .filter((link): link is { position: number; dog: BookingDog } =>
+        Boolean(link.dog),
+      )
+      .sort((a, b) => a.position - b.position)
+      .map((link) => link.dog) ?? [];
+
+  return linkedDogs.length > 0 ? linkedDogs : [booking.dog];
+}
+
+function getBookingDogNames(booking: Booking) {
+  return getBookingDogs(booking)
+    .map((dog) => dog.name)
+    .join(", ");
+}
+
 function getTodayDateKey() {
   const today = new Date();
   const year = today.getFullYear();
@@ -131,7 +182,7 @@ function isBookingActiveOnDate(booking: Booking, dateKey: string) {
     return booking.start_date === dateKey;
   }
 
-  return booking.start_date <= dateKey && booking.end_date > dateKey;
+  return booking.start_date <= dateKey && booking.end_date >= dateKey;
 }
 
 async function readJsonResponse<T extends BaseApiResponse>(
@@ -495,8 +546,8 @@ export default function AdminPrenotazioniPage() {
           booking.customer.last_name,
           booking.customer.email,
           booking.customer.phone,
-          booking.dog.name,
-          booking.dog.breed ?? "",
+          getBookingDogNames(booking),
+          ...getBookingDogs(booking).map((dog) => dog.breed ?? ""),
           booking.notes ?? "",
           booking.admin_notes ?? "",
         ].join(" "),
@@ -544,8 +595,12 @@ export default function AdminPrenotazioniPage() {
 
   const activeTodayCount = useMemo(
     () =>
-      bookings.filter((booking) => isBookingActiveOnDate(booking, todayKey))
-        .length,
+      bookings
+        .filter((booking) => isBookingActiveOnDate(booking, todayKey))
+        .reduce(
+          (total, booking) => total + getBookingDogs(booking).length,
+          0,
+        ),
     [bookings, todayKey],
   );
 
@@ -908,6 +963,8 @@ export default function AdminPrenotazioniPage() {
               startDate: booking.start_date,
               endDate: booking.end_date,
             };
+            const bookingDogs = getBookingDogs(booking);
+            const bookingDogNames = getBookingDogNames(booking);
 
             return (
               <article
@@ -917,7 +974,7 @@ export default function AdminPrenotazioniPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-bold text-slate-950">
-                      {booking.dog.name}
+                      {bookingDogNames}
                     </h2>
 
                     <span
@@ -1090,24 +1147,53 @@ export default function AdminPrenotazioniPage() {
                   </div>
 
                   <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-sm font-bold text-slate-700">Cane</p>
-
-                    <p className="mt-2 text-sm text-slate-600">
-                      Razza: {booking.dog.breed ?? "Non specificata"}
+                    <p className="text-sm font-bold text-slate-700">
+                      {bookingDogs.length === 1 ? "Cane" : "Cani"}
                     </p>
 
-                    <p className="text-sm text-slate-600">
-                      Taglia: {booking.dog.size}
-                    </p>
+                    <div className="mt-2 space-y-3">
+                      {bookingDogs.map((dog, index) => (
+                        <div key={dog.id} className="text-sm text-slate-600">
+                          <p className="font-semibold text-slate-800">
+                            {index + 1}. {dog.name}
+                          </p>
+                          <p>Razza: {dog.breed ?? "Non specificata"}</p>
+                          <p>Taglia: {dog.size}</p>
+                          <p>Eta: {dog.age ?? "Non specificata"}</p>
+                        </div>
+                      ))}
+                    </div>
 
-                    <p className="text-sm text-slate-600">
-                      Età: {booking.dog.age ?? "Non specificata"}
+                    <p className="mt-3 text-xs font-semibold text-slate-500">
+                      Box richiesti: {booking.box_count ?? 1}
                     </p>
                   </div>
                 </div>
 
                 {isExpanded && (
                   <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                    {(booking.estimated_price_cents !== null ||
+                      (booking.selected_extra_services?.length ?? 0) > 0) && (
+                      <div className="rounded-2xl bg-green-50 p-4 text-sm text-green-950">
+                        <p className="font-bold">Preventivo</p>
+
+                        <p className="mt-2 text-2xl font-bold">
+                          {booking.estimated_price_cents !== null
+                            ? formatEuro(booking.estimated_price_cents)
+                            : "Non calcolato"}
+                        </p>
+
+                        <p className="mt-3 font-semibold">Servizi extra</p>
+                        <p className="mt-1 leading-6">
+                          {booking.selected_extra_services?.length
+                            ? booking.selected_extra_services
+                                .map((service) => service.service)
+                                .join(", ")
+                            : "Nessun servizio extra selezionato."}
+                        </p>
+                      </div>
+                    )}
+
                     <div className="rounded-2xl bg-blue-50 p-4 text-sm text-blue-950">
                       <p className="font-bold">Note cliente</p>
 
@@ -1188,7 +1274,9 @@ export default function AdminPrenotazioniPage() {
         <p>
           Vuoi eliminare definitivamente la prenotazione di{" "}
           <span className="font-bold text-slate-900">
-            {bookingPendingDeletion?.dog.name}
+            {bookingPendingDeletion
+              ? getBookingDogNames(bookingPendingDeletion)
+              : ""}
           </span>
           ?
         </p>

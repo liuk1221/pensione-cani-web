@@ -27,6 +27,14 @@ type BookingAdminNotificationPayload = {
   dogAge: number | null;
   dogSex: string;
   dogSterilized: boolean | null;
+  dogs?: Array<{
+    name: string;
+    breed: string | null;
+    size: string;
+    age: number | null;
+    sex: string;
+    sterilized: boolean | null;
+  }>;
   startDate: string;
   endDate: string;
   stayType: string;
@@ -369,6 +377,68 @@ function getAdminDetailSection(
                 </div>`;
 }
 
+function getAdminDogSections(payload: BookingAdminNotificationPayload) {
+  const dogs =
+    payload.dogs && payload.dogs.length > 0
+      ? payload.dogs
+      : [
+          {
+            name: payload.dogName,
+            breed: payload.dogBreed,
+            size: payload.dogSize,
+            age: payload.dogAge,
+            sex: payload.dogSex,
+            sterilized: payload.dogSterilized,
+          },
+        ];
+
+  return dogs
+    .map((dog, index) =>
+      getAdminDetailSection(dogs.length === 1 ? "Cane" : `Cane ${index + 1}`, [
+        { label: "Nome", value: dog.name },
+        { label: "Razza", value: getOptionalText(dog.breed) },
+        { label: "Taglia", value: getDogSizeLabel(dog.size) },
+        {
+          label: "Eta",
+          value: dog.age === null ? "Non indicata" : `${dog.age} anni`,
+        },
+        { label: "Sesso", value: getDogSexLabel(dog.sex) },
+        { label: "Sterilizzato", value: getSterilizedLabel(dog.sterilized) },
+      ]),
+    )
+    .join("");
+}
+
+function getAdminDogText(payload: BookingAdminNotificationPayload) {
+  const dogs =
+    payload.dogs && payload.dogs.length > 0
+      ? payload.dogs
+      : [
+          {
+            name: payload.dogName,
+            breed: payload.dogBreed,
+            size: payload.dogSize,
+            age: payload.dogAge,
+            sex: payload.dogSex,
+            sterilized: payload.dogSterilized,
+          },
+        ];
+
+  return dogs
+    .flatMap((dog, index) => [
+      dogs.length === 1 ? "Cane" : `Cane ${index + 1}`,
+      `Nome: ${dog.name}`,
+      `Razza: ${getOptionalText(dog.breed)}`,
+      `Taglia: ${getDogSizeLabel(dog.size)}`,
+      `Eta: ${dog.age === null ? "Non indicata" : `${dog.age} anni`}`,
+      `Sesso: ${getDogSexLabel(dog.sex)}`,
+      `Sterilizzato: ${getSterilizedLabel(dog.sterilized)}`,
+      "",
+    ])
+    .join("\n")
+    .trimEnd();
+}
+
 function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
   const ownerFullName = `${payload.ownerName} ${payload.ownerSurname}`.trim();
   const siteName = escapeHtml(siteConfig.name);
@@ -426,20 +496,7 @@ function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
                   { label: "Email", value: payload.ownerEmail },
                   { label: "Telefono", value: payload.ownerPhone },
                 ])}
-                ${getAdminDetailSection("Cane", [
-                  { label: "Nome", value: payload.dogName },
-                  { label: "Razza", value: getOptionalText(payload.dogBreed) },
-                  { label: "Taglia", value: getDogSizeLabel(payload.dogSize) },
-                  {
-                    label: "Eta",
-                    value:
-                      payload.dogAge === null
-                        ? "Non indicata"
-                        : `${payload.dogAge} anni`,
-                  },
-                  { label: "Sesso", value: getDogSexLabel(payload.dogSex) },
-                  { label: "Sterilizzato", value: getSterilizedLabel(payload.dogSterilized) },
-                ])}
+                ${getAdminDogSections(payload)}
               </td>
             </tr>
             <tr>
@@ -481,15 +538,7 @@ function getAdminNotificationText(payload: BookingAdminNotificationPayload) {
     `Email: ${payload.ownerEmail}`,
     `Telefono: ${payload.ownerPhone}`,
     "",
-    "Cane",
-    `Nome: ${payload.dogName}`,
-    `Razza: ${getOptionalText(payload.dogBreed)}`,
-    `Taglia: ${getDogSizeLabel(payload.dogSize)}`,
-    `Eta: ${
-      payload.dogAge === null ? "Non indicata" : `${payload.dogAge} anni`
-    }`,
-    `Sesso: ${getDogSexLabel(payload.dogSex)}`,
-    `Sterilizzato: ${getSterilizedLabel(payload.dogSterilized)}`,
+    getAdminDogText(payload),
   ].join("\n");
 }
 

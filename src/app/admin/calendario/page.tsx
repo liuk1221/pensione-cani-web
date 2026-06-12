@@ -146,8 +146,16 @@ export default function AdminCalendarioPage() {
     }
 
     return getDateKeysInRange(startDate, endDate, {
-      includeEnd: false,
+      includeEnd: true,
     });
+  }
+
+  function getStayNights(startDate: string, endDate: string) {
+    if (startDate === endDate) {
+      return 0;
+    }
+
+    return getDateKeysInRange(startDate, endDate).length;
   }
 
   function getFirstUnavailableDate(startDate: string, endDate: string) {
@@ -257,18 +265,16 @@ export default function AdminCalendarioPage() {
     });
   }
 
-  const occupiedDates =
+  const stayNights =
     selectedStartDate && selectedEndDate
-      ? getOccupiedDatesForStay(selectedStartDate, selectedEndDate)
-      : [];
+      ? getStayNights(selectedStartDate, selectedEndDate)
+      : 0;
 
   const stayLabel =
     selectedStartDate && selectedEndDate
       ? selectedStartDate === selectedEndDate
         ? "Senza pernottamento"
-        : `${occupiedDates.length} ${
-            occupiedDates.length === 1 ? "notte" : "notti"
-          }`
+        : `${stayNights} ${stayNights === 1 ? "notte" : "notti"}`
       : "-";
 
   const canCreateBooking = Boolean(selectedStartDate && selectedEndDate);
@@ -386,7 +392,7 @@ export default function AdminCalendarioPage() {
               <p className="mt-2">
                 Il primo tocco seleziona arrivo e uscita nello stesso giorno.
                 Con un secondo tocco puoi impostare l&apos;uscita e creare un
-                intervallo. Il giorno di uscita non occupa il box.
+                intervallo. Il giorno di uscita occupa il box.
               </p>
             </div>
           </div>

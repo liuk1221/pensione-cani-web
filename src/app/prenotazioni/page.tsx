@@ -144,8 +144,16 @@ export default function PrenotazioniPage() {
     }
 
     return getDateKeysInRange(startDate, endDate, {
-      includeEnd: false,
+      includeEnd: true,
     });
+  }
+
+  function getStayNights(startDate: string, endDate: string) {
+    if (startDate === endDate) {
+      return 0;
+    }
+
+    return getDateKeysInRange(startDate, endDate).length;
   }
 
   function getFirstUnavailableDate(startDate: string, endDate: string) {
@@ -253,18 +261,16 @@ export default function PrenotazioniPage() {
     });
   }
 
-  const occupiedDates =
+  const stayNights =
     selectedStartDate && selectedEndDate
-      ? getOccupiedDatesForStay(selectedStartDate, selectedEndDate)
-      : [];
+      ? getStayNights(selectedStartDate, selectedEndDate)
+      : 0;
 
   const stayLabel =
     selectedStartDate && selectedEndDate
       ? selectedStartDate === selectedEndDate
         ? "Senza pernottamento"
-        : `${occupiedDates.length} ${
-            occupiedDates.length === 1 ? "notte" : "notti"
-          }`
+        : `${stayNights} ${stayNights === 1 ? "notte" : "notti"}`
       : "-";
 
   const canContinue = Boolean(selectedStartDate && selectedEndDate);
@@ -284,7 +290,7 @@ export default function PrenotazioniPage() {
           <p className="mt-4 text-slate-600">
             Tocca un giorno per selezionarlo come arrivo e uscita. Con un
             secondo tocco puoi impostare l&apos;uscita e creare un intervallo. In
-            caso di pernottamento, il giorno di uscita non occupa il box.
+            caso di pernottamento, il giorno di uscita occupa il box.
           </p>
         </div>
 
@@ -378,9 +384,9 @@ export default function PrenotazioniPage() {
           <div className="mt-8 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-950">
             <p className="font-bold">Regola disponibilità</p>
             <p className="mt-2">
-              Anche un giorno al completo può essere selezionato come giorno di
-              uscita. La prenotazione può avvenire attraverso tutti i canali
-              disponibili tra i contatti. Le richieste sono da ritenersi{" "}
+              Il giorno di uscita viene considerato occupato per il box. La
+              prenotazione può avvenire attraverso tutti i canali disponibili
+              tra i contatti. Le richieste sono da ritenersi{" "}
               <u>confermate solo una volta accettate dalla struttura</u>.
             </p>
           </div>
