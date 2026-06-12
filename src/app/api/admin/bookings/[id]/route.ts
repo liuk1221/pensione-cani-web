@@ -21,10 +21,16 @@ type BookingCustomer = {
 };
 
 type BookingDog = {
+  id?: string | null;
   name: string | null;
 };
 
 type BookingRelation<T> = T | T[] | null;
+
+type BookingDogLink = {
+  dog_id?: string | null;
+  dog?: BookingRelation<BookingDog>;
+};
 
 type CurrentBooking = {
   id: string;
@@ -32,8 +38,10 @@ type CurrentBooking = {
   stay_type: "day_care" | "overnight";
   start_date: string;
   end_date: string;
+  box_count: number | null;
   customer: BookingRelation<BookingCustomer>;
   dog: BookingRelation<BookingDog>;
+  booking_dogs: BookingDogLink[] | null;
 };
 
 type BookingToDelete = {
@@ -45,6 +53,7 @@ type BookingToDelete = {
   end_date: string;
   customer: BookingRelation<BookingCustomer>;
   dog: BookingRelation<BookingDog>;
+  booking_dogs: BookingDogLink[] | null;
 };
 
 type AvailabilityRow = {
@@ -67,6 +76,16 @@ function isValidDateKey(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function normalizeOptionalString(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function getStayType(startDate: string, endDate: string) {
   return startDate === endDate ? "day_care" : "overnight";
 }
@@ -76,7 +95,9 @@ function getStayDays(startDate: string, endDate: string) {
     return [startDate];
   }
 
-  return getDateKeysInRange(startDate, endDate);
+  return getDateKeysInRange(startDate, endDate, {
+    includeEnd: true,
+  });
 }
 
 function getSingleRelation<T>(relation: BookingRelation<T>) {
@@ -92,9 +113,69 @@ function getCustomerDisplayName(customer: BookingCustomer | null) {
   return fullName || "Cliente";
 }
 
+function getBookingDogNames(
+  primaryDog: BookingDog | null,
+  bookingDogs: BookingDogLink[] | null,
+) {
+  const names =
+    bookingDogs
+      ?.map((link) => getSingleRelation(link.dog)?.name?.trim())
+      .filter(Boolean) ?? [];
+
+  if (names.length > 0) {
+    return names.join(", ");
+  }
+
+  return primaryDog?.name ?? "il tuo cane";
+}
+
+async function getLinkedBookingDogs(bookingId: string) {
+  const { data: links, error: linksError } = await supabaseAdmin
+    .from("booking_dogs")
+    .select("dog_id")
+    .eq("booking_id", bookingId);
+
+  if (linksError) {
+    console.error("Booking dog links fetch error:", linksError);
+    return [];
+  }
+
+  const dogIds = Array.from(
+    new Set(
+      ((links ?? []) as Array<{ dog_id: string | null }>)
+        .map((link) => link.dog_id)
+        .filter((dogId): dogId is string => Boolean(dogId)),
+    ),
+  );
+
+  if (dogIds.length === 0) {
+    return [];
+  }
+
+  const { data: dogs, error: dogsError } = await supabaseAdmin
+    .from("dogs")
+    .select("id, name")
+    .in("id", dogIds);
+
+  if (dogsError) {
+    console.error("Linked booking dogs fetch error:", dogsError);
+    return dogIds.map((dogId) => ({ dog_id: dogId }));
+  }
+
+  const dogsById = new Map(
+    ((dogs ?? []) as BookingDog[]).map((dog) => [dog.id, dog]),
+  );
+
+  return dogIds.map((dogId) => ({
+    dog_id: dogId,
+    dog: dogsById.get(dogId) ?? null,
+  }));
+}
+
 async function checkAvailabilityBeforeConfirm(
   startDate: string,
   endDate: string,
+  requiredBoxes: number,
 ) {
   const { data, error } = await supabaseAdmin.rpc("get_public_availability", {
     from_date: startDate,
@@ -120,7 +201,7 @@ async function checkAvailabilityBeforeConfirm(
     return (
       !availability ||
       availability.status === "closed" ||
-      availability.available_boxes <= 0
+      availability.available_boxes < requiredBoxes
     );
   });
 
@@ -156,6 +237,7 @@ export async function PATCH(
   let body: {
     status?: unknown;
     adminNotes?: unknown;
+    customerMessage?: unknown;
     startDate?: unknown;
     endDate?: unknown;
   };
@@ -186,12 +268,14 @@ export async function PATCH(
         stay_type,
         start_date,
         end_date,
+        box_count,
         customer:customers (
           first_name,
           last_name,
           email
         ),
-        dog:dogs (
+        dog:dogs!bookings_dog_id_fkey (
+          id,
           name
         )
       `,
@@ -209,6 +293,7 @@ export async function PATCH(
   }
 
   const booking = currentBooking as CurrentBooking;
+  const bookingDogs = await getLinkedBookingDogs(booking.id);
   const nextStartDate =
     body.status === "confirmed" && isValidDateKey(body.startDate)
       ? body.startDate
@@ -229,6 +314,7 @@ export async function PATCH(
     const availabilityCheck = await checkAvailabilityBeforeConfirm(
       nextStartDate,
       nextEndDate,
+      booking.box_count ?? 1,
     );
 
     if (!availabilityCheck.ok) {
@@ -300,15 +386,17 @@ export async function PATCH(
 
   const customer = getSingleRelation(booking.customer);
   const dog = getSingleRelation(booking.dog);
+  const dogName = getBookingDogNames(dog, bookingDogs);
 
   if (shouldSendStatusEmail && customer?.email) {
     await sendBookingStatusEmail({
       to: customer.email,
       ownerName: getCustomerDisplayName(customer),
-      dogName: dog?.name ?? "il tuo cane",
+      dogName,
       startDate: data.start_date,
       endDate: data.end_date,
       status: data.status,
+      customerMessage: normalizeOptionalString(body.customerMessage),
     }).catch((emailError) => {
       console.error("Admin booking status email error:", emailError);
     });
@@ -346,7 +434,8 @@ export async function DELETE(
         last_name,
         email
       ),
-      dog:dogs (
+      dog:dogs!bookings_dog_id_fkey (
+        id,
         name
       )
     `,
@@ -366,6 +455,16 @@ export async function DELETE(
   const bookingToDelete = booking as BookingToDelete;
   const customer = getSingleRelation(bookingToDelete.customer);
   const dog = getSingleRelation(bookingToDelete.dog);
+  const bookingDogs = await getLinkedBookingDogs(bookingToDelete.id);
+  const dogName = getBookingDogNames(dog, bookingDogs);
+  const dogIds = Array.from(
+    new Set(
+      [
+        bookingToDelete.dog_id,
+        ...bookingDogs.map((link) => link.dog_id),
+      ].filter((dogId): dogId is string => Boolean(dogId)),
+    ),
+  );
 
   const { error: bookingDeleteError } = await supabaseAdmin
     .from("bookings")
@@ -385,7 +484,7 @@ export async function DELETE(
     await sendBookingStatusEmail({
       to: customer.email,
       ownerName: getCustomerDisplayName(customer),
-      dogName: dog?.name ?? "il tuo cane",
+      dogName,
       startDate: bookingToDelete.start_date,
       endDate: bookingToDelete.end_date,
       status: "rejected",
@@ -394,26 +493,45 @@ export async function DELETE(
     });
   }
 
-  const { count: dogBookingCount, error: dogBookingCountError } =
-    await supabaseAdmin
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("dog_id", bookingToDelete.dog_id);
+  await Promise.all(
+    dogIds.map(async (dogId) => {
+      const [{ count: directCount, error: directCountError }, { count: linkCount, error: linkCountError }] =
+        await Promise.all([
+          supabaseAdmin
+            .from("bookings")
+            .select("id", { count: "exact", head: true })
+            .eq("dog_id", dogId),
+          supabaseAdmin
+            .from("booking_dogs")
+            .select("booking_id", { count: "exact", head: true })
+            .eq("dog_id", dogId),
+        ]);
 
-  if (dogBookingCountError) {
-    console.error("Dog booking count error:", dogBookingCountError);
-  }
+      if (directCountError) {
+        console.error("Dog booking count error:", directCountError);
+      }
 
-  if (!dogBookingCountError && dogBookingCount === 0) {
-    const { error: dogDeleteError } = await supabaseAdmin
-      .from("dogs")
-      .delete()
-      .eq("id", bookingToDelete.dog_id);
+      if (linkCountError) {
+        console.error("Dog booking link count error:", linkCountError);
+      }
 
-    if (dogDeleteError) {
-      console.error("Dog delete error:", dogDeleteError);
-    }
-  }
+      if (
+        !directCountError &&
+        !linkCountError &&
+        directCount === 0 &&
+        linkCount === 0
+      ) {
+        const { error: dogDeleteError } = await supabaseAdmin
+          .from("dogs")
+          .delete()
+          .eq("id", dogId);
+
+        if (dogDeleteError) {
+          console.error("Dog delete error:", dogDeleteError);
+        }
+      }
+    }),
+  );
 
   const { count: customerBookingCount, error: customerBookingCountError } =
     await supabaseAdmin

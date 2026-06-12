@@ -3,7 +3,22 @@ import {
   sendBookingAdminNotificationEmail,
   sendBookingReceivedEmail,
 } from "@/lib/email/booking-emails";
+import {
+  bookingPricing,
+  extraServices,
+  type DogSize,
+} from "@/lib/listino-config";
+import { calculateBookingEstimate } from "@/lib/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+
+type DogPayload = {
+  name?: unknown;
+  breed?: unknown;
+  size?: unknown;
+  age?: unknown;
+  sex?: unknown;
+  sterilized?: unknown;
+};
 
 type PublicBookingBody = {
   startDate?: unknown;
@@ -13,6 +28,11 @@ type PublicBookingBody = {
   ownerSurname?: unknown;
   email?: unknown;
   phone?: unknown;
+  expectedArrivalTime?: unknown;
+  expectedPickupTime?: unknown;
+
+  dogs?: unknown;
+  extraServiceIds?: unknown;
 
   dogName?: unknown;
   dogBreed?: unknown;
@@ -22,6 +42,15 @@ type PublicBookingBody = {
   dogSterilized?: unknown;
 
   notes?: unknown;
+};
+
+type NormalizedDog = {
+  name: string;
+  breed: string | null;
+  size: DogSize;
+  age: number | null;
+  sex: "male" | "female" | "unknown";
+  sterilized: boolean | null;
 };
 
 type AvailabilityRow = {
@@ -36,6 +65,8 @@ type AvailabilityRow = {
 type AdminProfile = {
   email: string | null;
 };
+
+const allowedDogSizes: DogSize[] = ["small", "medium", "large", "giant"];
 
 function isValidDateKey(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -74,6 +105,16 @@ function normalizeOptionalString(value: unknown) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function normalizeOptionalTime(value: unknown) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return /^\d{2}:\d{2}$/.test(trimmed) ? trimmed : null;
+}
+
 function parseDogAge(value: unknown) {
   if (typeof value !== "string" || value.trim() === "") {
     return null;
@@ -100,6 +141,16 @@ function parseSterilized(value: unknown) {
   return null;
 }
 
+function parseDogSex(value: unknown) {
+  return value === "male" || value === "female" ? value : "unknown";
+}
+
+function parseDogSize(value: unknown): DogSize | null {
+  return typeof value === "string" && allowedDogSizes.includes(value as DogSize)
+    ? (value as DogSize)
+    : null;
+}
+
 function getStayType(startDate: string, endDate: string) {
   return startDate === endDate ? "day_care" : "overnight";
 }
@@ -113,10 +164,98 @@ function getOccupiedDays(
     return rows.filter((row) => row.day === startDate);
   }
 
-  return rows.filter((row) => row.day >= startDate && row.day < endDate);
+  return rows.filter((row) => row.day >= startDate && row.day <= endDate);
 }
 
-async function checkAvailability(startDate: string, endDate: string) {
+function normalizeDogs(body: PublicBookingBody) {
+  const rawDogs = Array.isArray(body.dogs)
+    ? (body.dogs as DogPayload[])
+    : [
+        {
+          name: body.dogName,
+          breed: body.dogBreed,
+          size: body.dogSize,
+          age: body.dogAge,
+          sex: body.dogSex,
+          sterilized: body.dogSterilized,
+        },
+      ];
+
+  if (
+    rawDogs.length === 0 ||
+    rawDogs.length > bookingPricing.maxDogsPerBooking
+  ) {
+    return {
+      ok: false,
+      dogs: [],
+      error: `Puoi inserire da 1 a ${bookingPricing.maxDogsPerBooking} cani per prenotazione.`,
+    };
+  }
+
+  const dogs: NormalizedDog[] = [];
+
+  for (const rawDog of rawDogs) {
+    if (!isNonEmptyString(rawDog.name)) {
+      return {
+        ok: false,
+        dogs: [],
+        error: "Inserisci il nome di ogni cane.",
+      };
+    }
+
+    const size = parseDogSize(rawDog.size);
+
+    if (!size) {
+      return {
+        ok: false,
+        dogs: [],
+        error: "Taglia cane non valida.",
+      };
+    }
+
+    dogs.push({
+      name: String(rawDog.name).trim(),
+      breed: normalizeOptionalString(rawDog.breed),
+      size,
+      age: parseDogAge(rawDog.age),
+      sex: parseDogSex(rawDog.sex),
+      sterilized: parseSterilized(rawDog.sterilized),
+    });
+  }
+
+  return {
+    ok: true,
+    dogs,
+    error: null,
+  };
+}
+
+function normalizeExtraServiceIds(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const allowedIds = new Set(extraServices.map((service) => service.id));
+
+  return Array.from(
+    new Set(
+      value.filter(
+        (item): item is string =>
+          typeof item === "string" && allowedIds.has(item),
+      ),
+    ),
+  );
+}
+
+function getRequiredBoxes(dogCount: number) {
+  return dogCount > 0 ? 1 : 0;
+}
+
+async function checkAvailability(
+  startDate: string,
+  endDate: string,
+  requiredBoxes: number,
+) {
   const { data, error } = await supabaseAdmin.rpc("get_public_availability", {
     from_date: startDate,
     to_date: endDate,
@@ -127,7 +266,7 @@ async function checkAvailability(startDate: string, endDate: string) {
 
     return {
       ok: false,
-      error: "Errore durante la verifica della disponibilità.",
+      error: "Errore durante la verifica della disponibilita.",
       status: 500,
     };
   }
@@ -136,7 +275,8 @@ async function checkAvailability(startDate: string, endDate: string) {
   const occupiedDays = getOccupiedDays(rows, startDate, endDate);
 
   const unavailableDay = occupiedDays.find(
-    (day) => day.status === "closed" || day.available_boxes <= 0,
+    (day) =>
+      day.status === "closed" || day.available_boxes < requiredBoxes,
   );
 
   if (unavailableDay) {
@@ -194,7 +334,7 @@ export async function POST(request: NextRequest) {
 
   if (endDate < startDate) {
     return NextResponse.json(
-      { error: "La data di uscita non può essere precedente all’arrivo." },
+      { error: "La data di uscita non puo essere precedente all'arrivo." },
       { status: 400 },
     );
   }
@@ -203,9 +343,7 @@ export async function POST(request: NextRequest) {
     !isNonEmptyString(body.ownerName) ||
     !isNonEmptyString(body.ownerSurname) ||
     !isNonEmptyString(body.email) ||
-    !isNonEmptyString(body.phone) ||
-    !isNonEmptyString(body.dogName) ||
-    !isNonEmptyString(body.dogSize)
+    !isNonEmptyString(body.phone)
   ) {
     return NextResponse.json(
       { error: "Compila tutti i campi obbligatori." },
@@ -220,31 +358,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const dogSize = String(body.dogSize);
+  const normalizedDogs = normalizeDogs(body);
 
-  if (!["small", "medium", "large", "giant"].includes(dogSize)) {
+  if (!normalizedDogs.ok) {
     return NextResponse.json(
-      { error: "Taglia cane non valida." },
+      { error: normalizedDogs.error },
       { status: 400 },
     );
   }
 
-  const dogSex =
-    body.dogSex === "male" || body.dogSex === "female"
-      ? body.dogSex
-      : "unknown";
-  const dogAge = parseDogAge(body.dogAge);
-  const dogSterilized = parseSterilized(body.dogSterilized);
+  const dogs = normalizedDogs.dogs;
+  const requiredBoxes = getRequiredBoxes(dogs.length);
+  const extraServiceIds = normalizeExtraServiceIds(body.extraServiceIds);
+  const estimate = calculateBookingEstimate({
+    startDate,
+    endDate,
+    dogs,
+    extraServiceIds,
+  });
   const ownerName = String(body.ownerName).trim();
   const ownerSurname = String(body.ownerSurname).trim();
   const ownerEmail = String(body.email).trim().toLowerCase();
   const ownerPhone = normalizePhone(body.phone);
-  const dogName = String(body.dogName).trim();
-  const dogBreed = normalizeOptionalString(body.dogBreed);
+  const expectedArrivalTime = normalizeOptionalTime(body.expectedArrivalTime);
+  const expectedPickupTime = normalizeOptionalTime(body.expectedPickupTime);
   const notes = normalizeOptionalString(body.notes);
   const stayType = getStayType(startDate, endDate);
 
-  const availabilityCheck = await checkAvailability(startDate, endDate);
+  const availabilityCheck = await checkAvailability(
+    startDate,
+    endDate,
+    requiredBoxes,
+  );
 
   if (!availabilityCheck.ok) {
     return NextResponse.json(
@@ -273,42 +418,53 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: dog, error: dogError } = await supabaseAdmin
+  const { data: insertedDogs, error: dogError } = await supabaseAdmin
     .from("dogs")
-    .insert({
-      customer_id: customer.id,
-      name: dogName,
-      breed: dogBreed,
-      size: dogSize,
-      age: dogAge,
-      sex: dogSex,
-      sterilized: dogSterilized,
-    })
-    .select("id")
-    .single();
+    .insert(
+      dogs.map((dog) => ({
+        customer_id: customer.id,
+        name: dog.name,
+        breed: dog.breed,
+        size: dog.size,
+        age: dog.age,
+        sex: dog.sex,
+        sterilized: dog.sterilized,
+      })),
+    )
+    .select("id");
 
-  if (dogError || !dog) {
-    console.error("Public booking dog insert error:", dogError);
+  if (dogError || !insertedDogs || insertedDogs.length !== dogs.length) {
+    console.error("Public booking dogs insert error:", dogError);
 
     return NextResponse.json(
-      { error: "Errore durante il salvataggio del cane." },
+      { error: "Errore durante il salvataggio dei cani." },
       { status: 500 },
     );
   }
+
+  const primaryDog = insertedDogs[0];
+  const now = new Date().toISOString();
 
   const { data: booking, error: bookingError } = await supabaseAdmin
     .from("bookings")
     .insert({
       customer_id: customer.id,
-      dog_id: dog.id,
+      dog_id: primaryDog.id,
       source: "online",
       status: "pending",
       stay_type: stayType,
       start_date: startDate,
       end_date: endDate,
+      expected_arrival_time: expectedArrivalTime,
+      expected_pickup_time: expectedPickupTime,
       notes,
       admin_notes: null,
       confirmed_at: null,
+      box_count: requiredBoxes,
+      estimated_price_cents: estimate.isComplete ? estimate.totalCents : null,
+      estimated_price_details: estimate,
+      selected_extra_services: estimate.selectedExtras,
+      updated_at: now,
     })
     .select("id, created_at")
     .single();
@@ -322,10 +478,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const { error: bookingDogsError } = await supabaseAdmin
+    .from("booking_dogs")
+    .insert(
+      insertedDogs.map((dog, index) => ({
+        booking_id: booking.id,
+        dog_id: dog.id,
+        position: index + 1,
+      })),
+    );
+
+  if (bookingDogsError) {
+    console.error("Public booking dogs link error:", bookingDogsError);
+
+    return NextResponse.json(
+      { error: "Errore durante il collegamento dei cani alla prenotazione." },
+      { status: 500 },
+    );
+  }
+
+  const dogNames = dogs.map((dog) => dog.name).join(", ");
+  const firstDog = dogs[0];
+
   await sendBookingReceivedEmail({
     to: ownerEmail,
     ownerName,
-    dogName,
+    dogName: dogNames,
     startDate,
     endDate,
   }).catch((error) => {
@@ -344,14 +522,24 @@ export async function POST(request: NextRequest) {
         ownerSurname,
         ownerEmail,
         ownerPhone,
-        dogName,
-        dogBreed,
-        dogSize,
-        dogAge,
-        dogSex,
-        dogSterilized,
+        dogName: dogNames,
+        dogBreed: firstDog.breed,
+        dogSize: firstDog.size,
+        dogAge: firstDog.age,
+        dogSex: firstDog.sex,
+        dogSterilized: firstDog.sterilized,
+        dogs: dogs.map((dog) => ({
+          name: dog.name,
+          breed: dog.breed,
+          size: dog.size,
+          age: dog.age,
+          sex: dog.sex,
+          sterilized: dog.sterilized,
+        })),
         startDate,
         endDate,
+        expectedArrivalTime,
+        expectedPickupTime,
         stayType,
         source: "online",
         status: "pending",

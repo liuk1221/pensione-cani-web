@@ -8,6 +8,7 @@ type ConfirmedBooking = {
   stay_type: "day_care" | "overnight";
   start_date: string;
   end_date: string;
+  booking_dogs?: Array<{ dog_id: string | null }> | null;
 };
 
 type DashboardBooking = ConfirmedBooking & {
@@ -28,7 +29,7 @@ function isBookingActiveToday(booking: ConfirmedBooking, todayKey: string) {
     return booking.start_date === todayKey;
   }
 
-  return booking.start_date <= todayKey && booking.end_date > todayKey;
+  return booking.start_date <= todayKey && booking.end_date >= todayKey;
 }
 
 async function getAdminDashboardData() {
@@ -37,7 +38,7 @@ async function getAdminDashboardData() {
   const [bookingsResponse, settingsResponse] = await Promise.all([
     supabaseAdmin
       .from("bookings")
-      .select("status, stay_type, start_date, end_date"),
+      .select("status, stay_type, start_date, end_date, booking_dogs ( dog_id )"),
     supabaseAdmin
       .from("app_settings")
       .select("total_boxes")
@@ -57,7 +58,10 @@ async function getAdminDashboardData() {
 
   const activeTodayCount = confirmedBookings.filter((booking) =>
     isBookingActiveToday(booking, todayKey),
-  ).length;
+  ).reduce(
+    (total, booking) => total + Math.max(1, booking.booking_dogs?.length ?? 0),
+    0,
+  );
 
   return {
     pendingCount: bookings.filter((booking) => booking.status === "pending")

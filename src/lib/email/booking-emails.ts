@@ -11,6 +11,7 @@ type BookingEmailPayload = {
   startDate: string;
   endDate: string;
   status: BookingEmailStatus;
+  customerMessage?: string | null;
 };
 
 type BookingAdminNotificationPayload = {
@@ -27,8 +28,18 @@ type BookingAdminNotificationPayload = {
   dogAge: number | null;
   dogSex: string;
   dogSterilized: boolean | null;
+  dogs?: Array<{
+    name: string;
+    breed: string | null;
+    size: string;
+    age: number | null;
+    sex: string;
+    sterilized: boolean | null;
+  }>;
   startDate: string;
   endDate: string;
+  expectedArrivalTime?: string | null;
+  expectedPickupTime?: string | null;
   stayType: string;
   source: string;
   status: string;
@@ -103,6 +114,14 @@ function formatDateTime(value: string | null) {
 
 function getOptionalText(value: string | null | undefined) {
   return value && value.trim().length > 0 ? value : "Non indicato";
+}
+
+function getOptionalTime(value: string | null | undefined) {
+  return value && value.trim().length > 0 ? value.slice(0, 5) : "Non indicato";
+}
+
+function escapeHtmlWithLineBreaks(value: string) {
+  return escapeHtml(value).replace(/\r?\n/g, "<br>");
 }
 
 function getDogSizeLabel(size: string) {
@@ -251,6 +270,7 @@ function getEmailHtml(payload: BookingEmailPayload) {
   const replyTo = escapeHtml(getEmailReplyTo());
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   const safeSiteUrl = siteUrl ? escapeHtml(siteUrl) : "";
+  const customerMessage = payload.customerMessage?.trim();
 
   return `<!doctype html>
 <html lang="it">
@@ -300,6 +320,18 @@ function getEmailHtml(payload: BookingEmailPayload) {
                 </table>
               </td>
             </tr>
+            ${
+              customerMessage
+                ? `<tr>
+              <td style="padding:6px 28px 12px;">
+                <div style="border:1px solid #e2e8f0;border-radius:18px;background:#ffffff;padding:18px 20px;text-align:left;">
+                  <div style="color:#64748b;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;">Messaggio dalla struttura</div>
+                  <div style="margin-top:8px;color:#0f172a;font-size:15px;line-height:1.7;">${escapeHtmlWithLineBreaks(customerMessage)}</div>
+                </div>
+              </td>
+            </tr>`
+                : ""
+            }
             <tr>
               <td style="padding:18px 28px 34px;text-align:center;">
                 <p style="margin:0 auto;max-width:520px;color:#64748b;font-size:14px;line-height:1.6;">
@@ -331,6 +363,13 @@ function getEmailText(payload: BookingEmailPayload) {
     "",
     `Cane: ${payload.dogName}`,
     `Periodo: ${getDateSummary(payload.startDate, payload.endDate)}`,
+    ...(payload.customerMessage?.trim()
+      ? [
+          "",
+          "Messaggio dalla struttura:",
+          payload.customerMessage.trim(),
+        ]
+      : []),
     "",
     `Per domande puoi scrivere a ${getEmailReplyTo()} o agli altri contatti disponibili sul sito.`,
   ].join("\n");
@@ -367,6 +406,68 @@ function getAdminDetailSection(
                     ${getAdminDetailRows(rows)}
                   </table>
                 </div>`;
+}
+
+function getAdminDogSections(payload: BookingAdminNotificationPayload) {
+  const dogs =
+    payload.dogs && payload.dogs.length > 0
+      ? payload.dogs
+      : [
+          {
+            name: payload.dogName,
+            breed: payload.dogBreed,
+            size: payload.dogSize,
+            age: payload.dogAge,
+            sex: payload.dogSex,
+            sterilized: payload.dogSterilized,
+          },
+        ];
+
+  return dogs
+    .map((dog, index) =>
+      getAdminDetailSection(dogs.length === 1 ? "Cane" : `Cane ${index + 1}`, [
+        { label: "Nome", value: dog.name },
+        { label: "Razza", value: getOptionalText(dog.breed) },
+        { label: "Taglia", value: getDogSizeLabel(dog.size) },
+        {
+          label: "Eta",
+          value: dog.age === null ? "Non indicata" : `${dog.age} anni`,
+        },
+        { label: "Sesso", value: getDogSexLabel(dog.sex) },
+        { label: "Sterilizzato", value: getSterilizedLabel(dog.sterilized) },
+      ]),
+    )
+    .join("");
+}
+
+function getAdminDogText(payload: BookingAdminNotificationPayload) {
+  const dogs =
+    payload.dogs && payload.dogs.length > 0
+      ? payload.dogs
+      : [
+          {
+            name: payload.dogName,
+            breed: payload.dogBreed,
+            size: payload.dogSize,
+            age: payload.dogAge,
+            sex: payload.dogSex,
+            sterilized: payload.dogSterilized,
+          },
+        ];
+
+  return dogs
+    .flatMap((dog, index) => [
+      dogs.length === 1 ? "Cane" : `Cane ${index + 1}`,
+      `Nome: ${dog.name}`,
+      `Razza: ${getOptionalText(dog.breed)}`,
+      `Taglia: ${getDogSizeLabel(dog.size)}`,
+      `Eta: ${dog.age === null ? "Non indicata" : `${dog.age} anni`}`,
+      `Sesso: ${getDogSexLabel(dog.sex)}`,
+      `Sterilizzato: ${getSterilizedLabel(dog.sterilized)}`,
+      "",
+    ])
+    .join("\n")
+    .trimEnd();
 }
 
 function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
@@ -419,6 +520,8 @@ function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
                   { label: "Stato", value: getStatusLabel(payload.status) },
                   { label: "Tipologia", value: getStayTypeLabel(payload.stayType) },
                   { label: "Periodo", value: getDateSummary(payload.startDate, payload.endDate) },
+                  { label: "Orario previsto di arrivo", value: getOptionalTime(payload.expectedArrivalTime) },
+                  { label: "Orario previsto di ritiro", value: getOptionalTime(payload.expectedPickupTime) },
                   { label: "Note cliente", value: getOptionalText(payload.notes) },
                 ])}
                 ${getAdminDetailSection("Proprietario", [
@@ -426,20 +529,7 @@ function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
                   { label: "Email", value: payload.ownerEmail },
                   { label: "Telefono", value: payload.ownerPhone },
                 ])}
-                ${getAdminDetailSection("Cane", [
-                  { label: "Nome", value: payload.dogName },
-                  { label: "Razza", value: getOptionalText(payload.dogBreed) },
-                  { label: "Taglia", value: getDogSizeLabel(payload.dogSize) },
-                  {
-                    label: "Eta",
-                    value:
-                      payload.dogAge === null
-                        ? "Non indicata"
-                        : `${payload.dogAge} anni`,
-                  },
-                  { label: "Sesso", value: getDogSexLabel(payload.dogSex) },
-                  { label: "Sterilizzato", value: getSterilizedLabel(payload.dogSterilized) },
-                ])}
+                ${getAdminDogSections(payload)}
               </td>
             </tr>
             <tr>
@@ -474,6 +564,8 @@ function getAdminNotificationText(payload: BookingAdminNotificationPayload) {
     `Stato: ${getStatusLabel(payload.status)}`,
     `Tipologia: ${getStayTypeLabel(payload.stayType)}`,
     `Periodo: ${getDateSummary(payload.startDate, payload.endDate)}`,
+    `Orario previsto di arrivo: ${getOptionalTime(payload.expectedArrivalTime)}`,
+    `Orario previsto di ritiro: ${getOptionalTime(payload.expectedPickupTime)}`,
     `Note cliente: ${getOptionalText(payload.notes)}`,
     "",
     "Proprietario",
@@ -481,15 +573,7 @@ function getAdminNotificationText(payload: BookingAdminNotificationPayload) {
     `Email: ${payload.ownerEmail}`,
     `Telefono: ${payload.ownerPhone}`,
     "",
-    "Cane",
-    `Nome: ${payload.dogName}`,
-    `Razza: ${getOptionalText(payload.dogBreed)}`,
-    `Taglia: ${getDogSizeLabel(payload.dogSize)}`,
-    `Eta: ${
-      payload.dogAge === null ? "Non indicata" : `${payload.dogAge} anni`
-    }`,
-    `Sesso: ${getDogSexLabel(payload.dogSex)}`,
-    `Sterilizzato: ${getSterilizedLabel(payload.dogSterilized)}`,
+    getAdminDogText(payload),
   ].join("\n");
 }
 
