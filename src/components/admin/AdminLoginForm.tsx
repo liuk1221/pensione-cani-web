@@ -14,6 +14,7 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,12 +67,54 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
 
       <div>
         <label className="text-sm font-semibold text-slate-700">Password</label>
-        <input
-          name="password"
-          type="password"
-          required
-          className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-        />
+        <div className="relative mt-2">
+          <input
+            name="password"
+            type={showPassword ? "text" : "password"}
+            required
+            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+          />
+
+          <button
+            type="button"
+            aria-label={showPassword ? "Nascondi password" : "Mostra password"}
+            aria-pressed={showPassword}
+            onClick={() => setShowPassword((value) => !value)}
+            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-2xl text-slate-500 transition hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
+          >
+            {showPassword ? (
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="m3 3 18 18" />
+                <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                <path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c5 0 9 4.5 10 8a12.4 12.4 0 0 1-2.2 3.9" />
+                <path d="M6.6 6.6A12.4 12.4 0 0 0 2 12c1 3.5 5 8 10 8a10.7 10.7 0 0 0 4.4-.9" />
+              </svg>
+            ) : (
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {error && (

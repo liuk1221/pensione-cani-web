@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { formatDateKey } from "@/lib/date-utils";
 import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 
 type Settings = {
@@ -553,7 +554,9 @@ export default function AdminDisponibilitaPage() {
                       className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4"
                     >
                       <div>
-                        <p className="font-bold text-slate-950">{item.date}</p>
+                        <p className="font-bold text-slate-950">
+                          {formatDateKey(item.date)}
+                        </p>
                         <p className="text-sm text-slate-500">
                           {item.reason ?? "Nessun motivo indicato"}
                         </p>
@@ -590,7 +593,9 @@ export default function AdminDisponibilitaPage() {
                       className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4"
                     >
                       <div>
-                        <p className="font-bold text-slate-950">{item.date}</p>
+                        <p className="font-bold text-slate-950">
+                          {formatDateKey(item.date)}
+                        </p>
                         <p className="text-sm text-slate-600">
                           Box bloccati: {item.blocked_boxes}
                         </p>

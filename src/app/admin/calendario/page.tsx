@@ -8,6 +8,7 @@ import {
 import { ManualBookingForm } from "@/components/admin/ManualBookingForm";
 import {
   compareDateKeys,
+  formatDateKey,
   getDateKeysInRange,
   toDateKey,
 } from "@/lib/date-utils";
@@ -168,7 +169,12 @@ export default function AdminCalendarioPage() {
       return true;
     }
 
-    if (!selectedStartDate || selectedEndDate) {
+    const hasCompletedRange =
+      selectedStartDate &&
+      selectedEndDate &&
+      selectedStartDate !== selectedEndDate;
+
+    if (!selectedStartDate || hasCompletedRange) {
       return !hasAvailableDate(date);
     }
 
@@ -187,7 +193,12 @@ export default function AdminCalendarioPage() {
     setSelectionError(null);
     setBookingSuccessMessage(null);
 
-    if (!selectedStartDate || selectedEndDate) {
+    const hasCompletedRange =
+      selectedStartDate &&
+      selectedEndDate &&
+      selectedStartDate !== selectedEndDate;
+
+    if (!selectedStartDate || hasCompletedRange) {
       if (!hasAvailableDate(date)) {
         setSelectionError(
           "La data di arrivo deve avere almeno uno slot libero.",
@@ -196,7 +207,7 @@ export default function AdminCalendarioPage() {
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(null);
+      setSelectedEndDate(date);
       return;
     }
 
@@ -209,7 +220,7 @@ export default function AdminCalendarioPage() {
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(null);
+      setSelectedEndDate(date);
       return;
     }
 
@@ -217,7 +228,7 @@ export default function AdminCalendarioPage() {
 
     if (unavailableDate) {
       setSelectionError(
-        `L’intervallo contiene una data non disponibile: ${unavailableDate}.`,
+        "Intervallo non disponibile: " + formatDateKey(unavailableDate) + ".",
       );
       return;
     }
@@ -329,14 +340,18 @@ export default function AdminCalendarioPage() {
               <div>
                 <p className="font-semibold text-slate-700">Arrivo</p>
                 <p className="mt-1 text-slate-500">
-                  {selectedStartDate ?? "Non selezionato"}
+                  {selectedStartDate
+                    ? formatDateKey(selectedStartDate)
+                    : "Non selezionato"}
                 </p>
               </div>
 
               <div>
                 <p className="font-semibold text-slate-700">Uscita</p>
                 <p className="mt-1 text-slate-500">
-                  {selectedEndDate ?? "Non selezionato"}
+                  {selectedEndDate
+                    ? formatDateKey(selectedEndDate)
+                    : "Non selezionato"}
                 </p>
               </div>
 
@@ -369,9 +384,9 @@ export default function AdminCalendarioPage() {
             <div className="mt-6 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-950">
               <p className="font-bold">Regola calendario</p>
               <p className="mt-2">
-                Seleziona prima il giorno di arrivo e poi il giorno di uscita.
-                Il giorno di uscita non occupa il box, quindi può essere
-                selezionato anche se risulta pieno.
+                Il primo tocco seleziona arrivo e uscita nello stesso giorno.
+                Con un secondo tocco puoi impostare l&apos;uscita e creare un
+                intervallo. Il giorno di uscita non occupa il box.
               </p>
             </div>
           </div>
