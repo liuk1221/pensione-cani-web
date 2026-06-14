@@ -26,7 +26,7 @@ const mainServices = [
 const careServices = [
   "Somministrazione pappa fornita dal proprietario",
   "Alimentazione della struttura su richiesta",
-  "Gestione farmaci con istruzioni scritte",
+  "Gestione integratori con istruzioni scritte",
   "Inserimento graduale per cani alla prima esperienza",
   "Possibilita di box condiviso per cani compatibili della stessa famiglia",
   "Contatto diretto con la struttura per aggiornamenti e necessita",
