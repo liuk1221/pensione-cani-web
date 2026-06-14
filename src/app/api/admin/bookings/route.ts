@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
-import { sendBookingReceivedEmail } from "@/lib/email/booking-emails";
+import {
+  sendBookingAdminNotificationEmail,
+  sendBookingReceivedEmail,
+} from "@/lib/email/booking-emails";
 import {
   bookingPricing,
   extraServices,
@@ -78,6 +81,10 @@ type BookingDogLinkRow = {
   booking_id: string;
   dog_id: string;
   position: number;
+};
+
+type AdminProfile = {
+  email: string | null;
 };
 
 type AdminBookingApiRow = Record<string, unknown> & {
@@ -390,6 +397,25 @@ async function checkAvailability(
   };
 }
 
+async function getAdminNotificationRecipients() {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("email")
+    .eq("role", "admin");
+
+  if (error) {
+    console.error("Admin notification recipients fetch error:", error);
+
+    return [];
+  }
+
+  const emails = ((data ?? []) as AdminProfile[])
+    .map((profile) => profile.email?.trim().toLowerCase() ?? "")
+    .filter(Boolean);
+
+  return Array.from(new Set(emails));
+}
+
 export async function GET() {
   const admin = await getCurrentAdmin();
 
@@ -578,6 +604,12 @@ export async function POST(request: NextRequest) {
   const extraServiceIds = normalizeExtraServiceIds(body.extraServiceIds);
   const expectedArrivalTime = normalizeOptionalTime(body.expectedArrivalTime);
   const expectedPickupTime = normalizeOptionalTime(body.expectedPickupTime);
+  const ownerName = String(body.ownerName).trim();
+  const ownerSurname = String(body.ownerSurname).trim();
+  const ownerEmail = normalizeEmailForDb(body.email);
+  const ownerPhone = normalizeRequiredDbString(body.phone);
+  const notes = normalizeOptionalString(body.notes);
+  const stayType = getStayType(startDate, endDate);
   const estimate = calculateBookingEstimate({
     startDate,
     endDate,
@@ -603,10 +635,10 @@ export async function POST(request: NextRequest) {
   const { data: customer, error: customerError } = await supabaseAdmin
     .from("customers")
     .insert({
-      first_name: String(body.ownerName).trim(),
-      last_name: String(body.ownerSurname).trim(),
-      email: normalizeEmailForDb(body.email),
-      phone: normalizeRequiredDbString(body.phone),
+      first_name: ownerName,
+      last_name: ownerSurname,
+      email: ownerEmail,
+      phone: ownerPhone,
     })
     .select("id")
     .single();
@@ -654,12 +686,12 @@ export async function POST(request: NextRequest) {
       dog_id: primaryDog.id,
       source,
       status,
-      stay_type: getStayType(startDate, endDate),
+      stay_type: stayType,
       start_date: startDate,
       end_date: endDate,
       expected_arrival_time: expectedArrivalTime,
       expected_pickup_time: expectedPickupTime,
-      notes: normalizeOptionalString(body.notes),
+      notes,
       admin_notes: normalizeOptionalString(body.adminNotes),
       confirmed_at: status === "confirmed" ? now : null,
       box_count: requiredBoxes,
@@ -668,7 +700,7 @@ export async function POST(request: NextRequest) {
       selected_extra_services: estimate.selectedExtras,
       updated_at: now,
     })
-    .select("id")
+    .select("id, created_at")
     .single();
 
   if (bookingError || !booking) {
@@ -701,8 +733,8 @@ export async function POST(request: NextRequest) {
 
   if (hasEmail(body.email)) {
     await sendBookingReceivedEmail({
-      to: normalizeEmailForDb(body.email),
-      ownerName: String(body.ownerName).trim(),
+      to: ownerEmail,
+      ownerName,
       dogName: dogs.map((dog) => dog.name).join(", "),
       startDate,
       endDate,
@@ -710,6 +742,51 @@ export async function POST(request: NextRequest) {
       console.error("Manual booking received email error:", emailError);
     });
   }
+
+  const dogNames = dogs.map((dog) => dog.name).join(", ");
+  const firstDog = dogs[0];
+  const adminRecipients = await getAdminNotificationRecipients();
+
+  await Promise.all(
+    adminRecipients.map((to) =>
+      sendBookingAdminNotificationEmail({
+        to,
+        bookingId: booking.id,
+        receivedAt: booking.created_at ?? null,
+        ownerName,
+        ownerSurname,
+        ownerEmail,
+        ownerPhone,
+        dogName: dogNames,
+        dogBreed: firstDog.breed,
+        dogSize: firstDog.size,
+        dogAge: firstDog.age,
+        dogSex: firstDog.sex,
+        dogSterilized: firstDog.sterilized,
+        dogs: dogs.map((dog) => ({
+          name: dog.name,
+          breed: dog.breed,
+          size: dog.size,
+          age: dog.age,
+          sex: dog.sex,
+          sterilized: dog.sterilized,
+        })),
+        startDate,
+        endDate,
+        expectedArrivalTime,
+        expectedPickupTime,
+        stayType,
+        source,
+        status,
+        notes,
+      }).catch((emailError) => {
+        console.error("Manual booking admin notification email error:", {
+          recipient: to,
+          error: emailError,
+        });
+      }),
+    ),
+  );
 
   return NextResponse.json(
     {
