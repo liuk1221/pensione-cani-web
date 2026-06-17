@@ -69,7 +69,7 @@ export function Navbar() {
 
           <div className="leading-tight">
             <p className="font-bold text-slate-900">{siteConfig.name}</p>
-            <p className="text-xs text-slate-500">
+            <p className="hidden text-xs text-slate-500 min-[420px]:block">
               {isAdminArea
                 ? "Area amministratore"
                 : "La miglior vacanza per il tuo migliore amico"}

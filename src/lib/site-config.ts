@@ -5,6 +5,7 @@ export const siteConfig = {
   email: "info@lapirella.it",
   address: "Frazione Melano 140M, Fabriano (AN)",
   whatsappNumber: "393384501079",
+  equestrianSiteUrl: "https://www.lapirella.it/",
   navItems: [
     {
       label: "Pensione",

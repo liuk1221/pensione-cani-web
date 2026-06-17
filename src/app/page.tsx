@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SectionTitle } from "@/components/ui/SectionTitle";
+import { HeroSlideshow } from "@/components/home/HeroSlideshow";
 
 const services = [
   {
@@ -10,7 +11,7 @@ const services = [
   {
     title: "Box dedicati",
     description:
-      "Ogni cane avrà a disposizione un ampio box e area esterna dedicato solo a lui.",
+      "Ogni cane avrà a disposizione un ampio box e un'area esterna dedicati solo a lui.",
   },
   {
     title: "Area gioco e sgambamento",
@@ -46,7 +47,7 @@ export default function HomePage() {
   return (
     <>
       <section className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700">
-        <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-28">
+        <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-20">
           <div>
             <p className="mb-4 inline-flex rounded-full bg-yellow-300 px-4 py-2 text-sm font-bold text-blue-950">
               Pensione per cani
@@ -78,26 +79,15 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl bg-white/10 p-4 shadow-2xl ring-1 ring-white/20">
-            <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-slate-100 text-center">
-              <div>
-                <p className="text-lg font-bold text-slate-700">
-                  Immagine struttura
-                </p>
-                <p className="mt-2 text-sm text-slate-500">
-                  !!! WORK IN PROGRESS !!!
-                </p>
-              </div>
-            </div>
-          </div>
+          <HeroSlideshow />
         </div>
       </section>
 
       <section className="px-4 py-20 sm:px-6 lg:px-8">
         <SectionTitle
           eyebrow="Servizi"
-          title="Tutto quello che serve per una permanenza serena"
-          description="Una struttura pensata per gestire accoglienza, sicurezza, disponibilità e comunicazione con i proprietari."
+          title="Tutto ciò che serve per un soggiorno sereno"
+          description="Cura, sicurezza e spazi dedicati: ogni ospite trova attenzioni su misura e i proprietari restano sempre aggiornati."
         />
 
         <div className="mx-auto mt-12 grid max-w-7xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -125,7 +115,7 @@ export default function HomePage() {
               Disponibilità
             </p>
             <h2 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Calendario prenotazione in base ai box disponibili
+              Controlla la disponibilità dei box
             </h2>
             <p className="mt-4 text-base leading-7 text-slate-600">
               Le prenotazioni vengono sempre confermate manualmente.
@@ -171,8 +161,8 @@ export default function HomePage() {
       <section className="px-4 py-20 sm:px-6 lg:px-8">
         <SectionTitle
           eyebrow="Prenotazioni"
-          title="Richiesta semplice e conferma rapida"
-          description="Invia la richiesta per lo slot che vorresti prenotare, riceverai subito una mail di avvenuta ricezione. Un nostro operatore ti ricontatterà il prima possibile per confermare la tua prenotazione!"
+          title="Una richiesta semplice, una conferma personale"
+          description="Scegli il periodo e inviaci le informazioni del tuo cane. Riceverai subito una mail di riepilogo e ti ricontatteremo per confermare il soggiorno."
         />
 
         <div className="mx-auto mt-10 max-w-3xl rounded-3xl bg-blue-950 p-8 text-center text-white">
