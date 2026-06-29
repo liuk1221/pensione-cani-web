@@ -2,7 +2,6 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type AdminLoginFormProps = {
   redirectTo: string;
@@ -10,8 +9,6 @@ type AdminLoginFormProps = {
 
 export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
   const router = useRouter();
-  const supabase = createSupabaseBrowserClient();
-
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -27,24 +24,18 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
 
-    const { error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (loginError) {
-      setError("Credenziali non valide.");
-      setIsLoading(false);
-      return;
-    }
-
-    const response = await fetch("/api/admin/me", {
-      cache: "no-store",
+    //Passa dal server per applicare rate limit e verifica del ruolo admin.
+    const response = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
     if (!response.ok) {
-      await supabase.auth.signOut();
-      setError("Accesso non autorizzato.");
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      setError(result?.error ?? "Credenziali non valide.");
       setIsLoading(false);
       return;
     }
@@ -61,6 +52,8 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
           name="email"
           type="email"
           required
+          maxLength={254}
+          autoComplete="username"
           className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
         />
       </div>
@@ -72,6 +65,8 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
             name="password"
             type={showPassword ? "text" : "password"}
             required
+            maxLength={256}
+            autoComplete="current-password"
             className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
           />
 

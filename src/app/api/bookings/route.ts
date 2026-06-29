@@ -10,6 +10,14 @@ import {
 } from "@/lib/listino-config";
 import { calculateBookingEstimate } from "@/lib/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  applyRateLimit,
+  forbiddenOriginResponse,
+  getClientIp,
+  isSameOriginRequest,
+  rateLimitResponse,
+  readJsonBody,
+} from "@/lib/request-security";
 
 type DogPayload = {
   name?: unknown;
@@ -67,6 +75,15 @@ type AdminProfile = {
 };
 
 const allowedDogSizes: DogSize[] = ["small", "medium", "large", "giant"];
+//Limiti server-side per contenere payload e dati persistiti.
+const fieldLimits = {
+  name: 100,
+  email: 254,
+  phone: 30,
+  dogName: 100,
+  breed: 100,
+  notes: 2_000,
+};
 
 function isValidDateKey(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -74,6 +91,16 @@ function isValidDateKey(value: unknown): value is string {
 
 function isNonEmptyString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isStringWithinLimit(value: unknown, maxLength: number) {
+  return typeof value === "string" && value.trim().length <= maxLength;
+}
+
+function isValidEmail(value: unknown) {
+  if (typeof value !== "string" || value.length > fieldLimits.email) return false;
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function normalizePhone(value: unknown) {
@@ -195,11 +222,15 @@ function normalizeDogs(body: PublicBookingBody) {
   const dogs: NormalizedDog[] = [];
 
   for (const rawDog of rawDogs) {
-    if (!isNonEmptyString(rawDog.name)) {
+    if (
+      !isNonEmptyString(rawDog.name) ||
+      !isStringWithinLimit(rawDog.name, fieldLimits.dogName) ||
+      !isStringWithinLimit(rawDog.breed ?? "", fieldLimits.breed)
+    ) {
       return {
         ok: false,
         dogs: [],
-        error: "Inserisci il nome di ogni cane.",
+        error: "I dati del cane sono mancanti o troppo lunghi.",
       };
     }
 
@@ -314,16 +345,38 @@ async function getAdminNotificationRecipients() {
 }
 
 export async function POST(request: NextRequest) {
-  let body: PublicBookingBody;
+  //Blocca invii cross-site del form pubblico.
+  if (!isSameOriginRequest(request)) return forbiddenOriginResponse();
 
-  try {
-    body = (await request.json()) as PublicBookingBody;
-  } catch {
+  const ip = getClientIp(request);
+  //Il doppio limite contiene sia raffiche brevi sia abuso continuativo.
+  const shortLimit = applyRateLimit({
+    key: `public-booking:15m:${ip}`,
+    limit: 5,
+    windowMs: 15 * 60 * 1_000,
+  });
+
+  if (!shortLimit.allowed) return rateLimitResponse(shortLimit.resetAt);
+
+  const dailyLimit = applyRateLimit({
+    key: `public-booking:day:${ip}`,
+    limit: 20,
+    windowMs: 24 * 60 * 60 * 1_000,
+  });
+
+  if (!dailyLimit.allowed) return rateLimitResponse(dailyLimit.resetAt);
+
+  //Legge solo JSON entro 16 KiB prima di elaborare la prenotazione.
+  const parsedBody = await readJsonBody<PublicBookingBody>(request, 16_384);
+
+  if (!parsedBody.ok) {
     return NextResponse.json(
-      { error: "Body JSON non valido." },
-      { status: 400 },
+      { error: parsedBody.error },
+      { status: parsedBody.status },
     );
   }
+
+  const body = parsedBody.value;
 
   if (!isValidDateKey(body.startDate) || !isValidDateKey(body.endDate)) {
     return NextResponse.json({ error: "Date non valide." }, { status: 400 });
@@ -342,11 +395,34 @@ export async function POST(request: NextRequest) {
   if (
     !isNonEmptyString(body.ownerName) ||
     !isNonEmptyString(body.ownerSurname) ||
-    !isNonEmptyString(body.email) ||
-    !isNonEmptyString(body.phone)
+    !isNonEmptyString(body.phone) ||
+    !isStringWithinLimit(body.ownerName, fieldLimits.name) ||
+    !isStringWithinLimit(body.ownerSurname, fieldLimits.name) ||
+    !isStringWithinLimit(body.phone, fieldLimits.phone) ||
+    !isStringWithinLimit(body.notes ?? "", fieldLimits.notes)
   ) {
     return NextResponse.json(
       { error: "Compila tutti i campi obbligatori." },
+      { status: 400 },
+    );
+  }
+
+  //Evita prenotazioni con intervalli irrealistici o date non interpretabili.
+  const stayDays =
+    (Date.parse(`${endDate}T00:00:00Z`) -
+      Date.parse(`${startDate}T00:00:00Z`)) /
+    86_400_000;
+
+  if (!Number.isFinite(stayDays) || stayDays > 370) {
+    return NextResponse.json(
+      { error: "Intervallo di prenotazione non valido o troppo ampio." },
+      { status: 400 },
+    );
+  }
+
+  if (!isValidEmail(body.email)) {
+    return NextResponse.json(
+      { error: "Inserisci un indirizzo email valido." },
       { status: 400 },
     );
   }
