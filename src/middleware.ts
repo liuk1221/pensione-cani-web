@@ -11,9 +11,42 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/admin") && !pathname.startsWith("/admin/login");
 
   const isAdminApi = pathname.startsWith("/api/admin");
+  //La login deve restare pubblica per poter creare la sessione.
+  const isPublicAdminApi = pathname === "/api/admin/login";
 
-  if (!isAdminPage && !isAdminApi) {
+  if ((!isAdminPage && !isAdminApi) || isPublicAdminApi) {
     return NextResponse.next();
+  }
+
+  //Protegge le modifiche admin da richieste cross-site e body eccessivi.
+  if (isAdminApi && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+
+    if (origin) {
+      try {
+        if (!host || new URL(origin).host !== host) {
+          return NextResponse.json(
+            { error: "Origine della richiesta non consentita." },
+            { status: 403 },
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { error: "Origine della richiesta non consentita." },
+          { status: 403 },
+        );
+      }
+    }
+
+    const contentLength = Number(request.headers.get("content-length") ?? 0);
+
+    if (Number.isFinite(contentLength) && contentLength > 65_536) {
+      return NextResponse.json(
+        { error: "Richiesta troppo grande." },
+        { status: 413 },
+      );
+    }
   }
 
   if (!supabaseUrl || !publishableKey) {

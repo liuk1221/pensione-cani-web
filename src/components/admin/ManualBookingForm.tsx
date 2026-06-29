@@ -488,9 +488,11 @@ export function ManualBookingForm({
               Note prenotazione
             </label>
 
+            {/* Limita le note anche lato browser per un feedback immediato. */}
             <textarea
               name="notes"
               rows={5}
+              maxLength={2000}
               placeholder="Richieste del cliente, esigenze del cane, alimentazione..."
               className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
             />
@@ -504,6 +506,7 @@ export function ManualBookingForm({
             <textarea
               name="adminNotes"
               rows={5}
+              maxLength={2000}
               placeholder="Note interne non visibili al cliente..."
               className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
             />
@@ -625,6 +628,9 @@ function Field({
         required={required}
         min={min}
         inputMode={inputMode}
+        maxLength={
+          type === "email" ? 254 : type === "tel" ? 30 : type === "text" ? 100 : undefined
+        }
         className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
       />
     </div>

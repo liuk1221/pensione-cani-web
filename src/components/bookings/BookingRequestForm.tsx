@@ -408,6 +408,7 @@ export function BookingRequestForm({
           <textarea
             name="notes"
             rows={5}
+            maxLength={2000}
             placeholder="Carattere, abitudini, farmaci, alimentazione, esigenze particolari..."
             className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
           />
@@ -556,6 +557,9 @@ function Field({
         pattern={pattern}
         inputMode={inputMode}
         title={title}
+        maxLength={
+          type === "email" ? 254 : type === "tel" ? 30 : type === "text" ? 100 : undefined
+        }
         className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
       />
     </div>
