@@ -4,6 +4,7 @@ import { siteConfig } from "@/lib/site-config";
 
 export function Footer() {
   const whatsappUrl = `https://wa.me/${siteConfig.whatsappNumber}`;
+  const privacyPolicyUrl = "/documents/privacy-policy-pirella-pet-resort.pdf";
 
   return (
     <footer className="border-t border-blue-900 bg-blue-950 text-white">
@@ -69,7 +70,18 @@ export function Footer() {
       </div>
 
       <div className="border-t border-blue-900 px-4 py-4 text-center text-xs text-blue-200">
-        © {new Date().getFullYear()} {siteConfig.name}. Tutti i diritti riservati.
+        <p>
+          © {new Date().getFullYear()} {siteConfig.name}. Tutti i diritti riservati.
+        </p>
+
+        <a
+          href={privacyPolicyUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-block font-semibold text-yellow-300 transition hover:text-white"
+        >
+          Privacy policy
+        </a>
       </div>
     </footer>
   );
