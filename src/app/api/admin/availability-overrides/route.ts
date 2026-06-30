@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
+import { isBoxType } from "@/lib/box-types";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 function isValidDateKey(value: unknown) {
@@ -49,7 +50,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("availability_overrides")
-    .select("id, date, blocked_boxes, reason, created_at")
+    .select("id, date, blocked_boxes, box_type, reason, created_at")
     .order("date", { ascending: true });
 
   if (error) {
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
   let body: {
     date?: unknown;
     blockedBoxes?: unknown;
+    boxType?: unknown;
     reason?: unknown;
   };
 
@@ -93,6 +95,14 @@ export async function POST(request: NextRequest) {
   }
 
   const blockedBoxes = Number(body.blockedBoxes);
+  const boxType = isBoxType(body.boxType) ? body.boxType : null;
+
+  if (!boxType) {
+    return NextResponse.json(
+      { error: "Tipologia box non valida." },
+      { status: 400 },
+    );
+  }
 
   if (!Number.isInteger(blockedBoxes) || blockedBoxes <= 0) {
     return NextResponse.json(
@@ -106,9 +116,10 @@ export async function POST(request: NextRequest) {
     .insert({
       date: body.date,
       blocked_boxes: blockedBoxes,
+      box_type: boxType,
       reason: normalizeOptionalString(body.reason),
     })
-    .select("id, date, blocked_boxes, reason, created_at")
+    .select("id, date, blocked_boxes, box_type, reason, created_at")
     .single();
 
   if (error) {

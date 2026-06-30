@@ -42,6 +42,7 @@ type BookingAdminNotificationPayload = {
   expectedPickupTime?: string | null;
   stayType: string;
   source: string;
+  submittedFromAdmin?: boolean;
   status: string;
   notes: string | null;
 };
@@ -473,6 +474,19 @@ function getAdminDogText(payload: BookingAdminNotificationPayload) {
 function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
   const ownerFullName = `${payload.ownerName} ${payload.ownerSurname}`.trim();
   const siteName = escapeHtml(siteConfig.name);
+  const isAdminCreated = payload.submittedFromAdmin || payload.source !== "online";
+  const notificationTitle = isAdminCreated
+    ? "Prenotazione inserita da admin"
+    : "Richiesta da confermare";
+  const notificationEyebrow = isAdminCreated
+    ? "Inserimento admin"
+    : "Nuova richiesta";
+  const notificationIntro = isAdminCreated
+    ? "Una nuova prenotazione e stata inserita dall'area admin. Di seguito trovi tutti i dati salvati."
+    : "Una nuova richiesta di prenotazione e stata inviata dal form pubblico. Di seguito trovi tutti i dati inseriti dal cliente.";
+  const notificationPreview = isAdminCreated
+    ? `Prenotazione inserita da admin per ${payload.dogName} da ${ownerFullName}.`
+    : `Nuova richiesta online per ${payload.dogName} da ${ownerFullName}.`;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   const adminBookingsUrl = siteUrl
     ? `${siteUrl.replace(/\/$/, "")}/admin/prenotazioni`
@@ -491,7 +505,7 @@ function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
   </head>
   <body style="margin:0;background:#f8fafc;color:#0f172a;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-      Nuova richiesta online per ${escapeHtml(payload.dogName)} da ${escapeHtml(ownerFullName)}.
+      ${escapeHtml(notificationPreview)}
     </div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;margin:0;padding:28px 12px;">
       <tr>
@@ -506,9 +520,12 @@ function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
             <tr>
               <td style="padding:34px 28px 10px;text-align:center;">
                 <div style="display:inline-block;width:72px;height:72px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:38px;font-weight:800;line-height:72px;text-align:center;">!</div>
-                <div style="margin-top:24px;color:#1d4ed8;font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;">Nuova richiesta</div>
-                <h1 style="margin:12px auto 0;max-width:520px;color:#020617;font-size:34px;line-height:1.08;font-weight:800;">Richiesta da confermare</h1>
+                <div style="margin-top:24px;color:#1d4ed8;font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;">${escapeHtml(notificationEyebrow)}</div>
+                <h1 style="margin:12px auto 0;max-width:520px;color:#020617;font-size:34px;line-height:1.08;font-weight:800;">${escapeHtml(notificationTitle)}</h1>
+                ${isAdminCreated ? `<p style="margin:18px auto 0;max-width:520px;color:#475569;font-size:16px;line-height:1.7;">${escapeHtml(notificationIntro)}</p>` : ""}
+                ${isAdminCreated ? "" : `
                 <p style="margin:18px auto 0;max-width:520px;color:#475569;font-size:16px;line-height:1.7;">Una nuova richiesta di prenotazione è stata inviata dal form pubblico. Di seguito trovi tutti i dati inseriti dal cliente.</p>
+                `}
               </td>
             </tr>
             <tr>
@@ -551,6 +568,10 @@ function getAdminNotificationHtml(payload: BookingAdminNotificationPayload) {
 
 function getAdminNotificationText(payload: BookingAdminNotificationPayload) {
   const ownerFullName = `${payload.ownerName} ${payload.ownerSurname}`.trim();
+  const isAdminCreated = payload.submittedFromAdmin || payload.source !== "online";
+  const notificationIntro = isAdminCreated
+    ? "Una nuova prenotazione e stata inserita dall'area admin."
+    : "Una nuova richiesta di prenotazione e stata inviata dal form pubblico.";
 
   return [
     `${siteConfig.name} - Nuova richiesta di prenotazione`,
@@ -574,7 +595,12 @@ function getAdminNotificationText(payload: BookingAdminNotificationPayload) {
     `Telefono: ${payload.ownerPhone}`,
     "",
     getAdminDogText(payload),
-  ].join("\n");
+  ]
+    .join("\n")
+    .replace(
+      /Una nuova richiesta di prenotazione .*form pubblico\./,
+      notificationIntro,
+    );
 }
 
 async function sendBookingEmail(payload: BookingEmailPayload) {
@@ -619,11 +645,16 @@ export async function sendBookingAdminNotificationEmail(
     return;
   }
 
+  const subjectPrefix =
+    payload.submittedFromAdmin || payload.source !== "online"
+      ? "Prenotazione inserita da admin"
+      : "Nuova richiesta di prenotazione";
+
   const { error } = await getResendClient().emails.send({
     from: getEmailFrom(),
     to: payload.to,
     replyTo: getEmailReplyTo(),
-    subject: `Nuova richiesta di prenotazione - ${payload.dogName}`,
+    subject: `${subjectPrefix} - ${payload.dogName}`,
     html: getAdminNotificationHtml(payload),
     text: getAdminNotificationText(payload),
   });

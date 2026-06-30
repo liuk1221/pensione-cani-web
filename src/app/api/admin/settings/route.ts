@@ -11,7 +11,9 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("app_settings")
-    .select("id, total_boxes, business_email, notification_email")
+    .select(
+      "id, total_boxes, outdoor_boxes, indoor_boxes, business_email, notification_email",
+    )
     .eq("id", 1)
     .single();
 
@@ -38,6 +40,8 @@ export async function PATCH(request: NextRequest) {
 
   let body: {
     totalBoxes?: unknown;
+    outdoorBoxes?: unknown;
+    indoorBoxes?: unknown;
   };
 
   try {
@@ -46,23 +50,33 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Body JSON non valido." }, { status: 400 });
   }
 
-  const totalBoxes = Number(body.totalBoxes);
+  const outdoorBoxes = Number(body.outdoorBoxes ?? body.totalBoxes);
+  const indoorBoxes = Number(body.indoorBoxes ?? 0);
 
-  if (!Number.isInteger(totalBoxes) || totalBoxes < 0) {
+  if (
+    !Number.isInteger(outdoorBoxes) ||
+    outdoorBoxes < 0 ||
+    !Number.isInteger(indoorBoxes) ||
+    indoorBoxes < 0
+  ) {
     return NextResponse.json(
       { error: "Numero box non valido." },
       { status: 400 },
     );
   }
 
+  const totalBoxes = outdoorBoxes + indoorBoxes;
+
   const { data, error } = await supabaseAdmin
     .from("app_settings")
     .update({
       total_boxes: totalBoxes,
+      outdoor_boxes: outdoorBoxes,
+      indoor_boxes: indoorBoxes,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1)
-    .select("id, total_boxes")
+    .select("id, total_boxes, outdoor_boxes, indoor_boxes")
     .single();
 
   if (error) {

@@ -5,7 +5,7 @@ import {
 } from "@/lib/email/booking-emails";
 import {
   bookingPricing,
-  extraServices,
+  selectableExtraServices,
   type DogSize,
 } from "@/lib/listino-config";
 import { calculateBookingEstimate } from "@/lib/pricing";
@@ -18,6 +18,8 @@ import {
   rateLimitResponse,
   readJsonBody,
 } from "@/lib/request-security";
+import { assignBoxTypeForRange } from "@/lib/box-availability";
+import { normalizeOptionalBoxType } from "@/lib/box-types";
 
 type DogPayload = {
   name?: unknown;
@@ -38,6 +40,7 @@ type PublicBookingBody = {
   phone?: unknown;
   expectedArrivalTime?: unknown;
   expectedPickupTime?: unknown;
+  boxType?: unknown;
 
   dogs?: unknown;
   extraServiceIds?: unknown;
@@ -59,15 +62,6 @@ type NormalizedDog = {
   age: number | null;
   sex: "male" | "female" | "unknown";
   sterilized: boolean | null;
-};
-
-type AvailabilityRow = {
-  day: string;
-  total_boxes: number;
-  occupied_boxes: number;
-  blocked_boxes: number;
-  available_boxes: number;
-  status: "available" | "limited" | "full" | "closed";
 };
 
 type AdminProfile = {
@@ -182,18 +176,6 @@ function getStayType(startDate: string, endDate: string) {
   return startDate === endDate ? "day_care" : "overnight";
 }
 
-function getOccupiedDays(
-  rows: AvailabilityRow[],
-  startDate: string,
-  endDate: string,
-) {
-  if (startDate === endDate) {
-    return rows.filter((row) => row.day === startDate);
-  }
-
-  return rows.filter((row) => row.day >= startDate && row.day <= endDate);
-}
-
 function normalizeDogs(body: PublicBookingBody) {
   const rawDogs = Array.isArray(body.dogs)
     ? (body.dogs as DogPayload[])
@@ -266,7 +248,9 @@ function normalizeExtraServiceIds(value: unknown) {
     return [];
   }
 
-  const allowedIds = new Set(extraServices.map((service) => service.id));
+  const allowedIds = new Set(
+    selectableExtraServices.map((service) => service.id),
+  );
 
   return Array.from(
     new Set(
@@ -280,49 +264,6 @@ function normalizeExtraServiceIds(value: unknown) {
 
 function getRequiredBoxes(dogCount: number) {
   return dogCount > 0 ? 1 : 0;
-}
-
-async function checkAvailability(
-  startDate: string,
-  endDate: string,
-  requiredBoxes: number,
-) {
-  const { data, error } = await supabaseAdmin.rpc("get_public_availability", {
-    from_date: startDate,
-    to_date: endDate,
-  });
-
-  if (error) {
-    console.error("Public booking availability check error:", error);
-
-    return {
-      ok: false,
-      error: "Errore durante la verifica della disponibilita.",
-      status: 500,
-    };
-  }
-
-  const rows = (data ?? []) as AvailabilityRow[];
-  const occupiedDays = getOccupiedDays(rows, startDate, endDate);
-
-  const unavailableDay = occupiedDays.find(
-    (day) =>
-      day.status === "closed" || day.available_boxes < requiredBoxes,
-  );
-
-  if (unavailableDay) {
-    return {
-      ok: false,
-      error: `La data ${unavailableDay.day} non ha slot disponibili.`,
-      status: 409,
-    };
-  }
-
-  return {
-    ok: true,
-    error: null,
-    status: 200,
-  };
 }
 
 async function getAdminNotificationRecipients() {
@@ -446,26 +387,48 @@ export async function POST(request: NextRequest) {
   const dogs = normalizedDogs.dogs;
   const requiredBoxes = getRequiredBoxes(dogs.length);
   const extraServiceIds = normalizeExtraServiceIds(body.extraServiceIds);
-  const estimate = calculateBookingEstimate({
-    startDate,
-    endDate,
-    dogs,
-    extraServiceIds,
-  });
   const ownerName = String(body.ownerName).trim();
   const ownerSurname = String(body.ownerSurname).trim();
   const ownerEmail = String(body.email).trim().toLowerCase();
   const ownerPhone = normalizePhone(body.phone);
   const expectedArrivalTime = normalizeOptionalTime(body.expectedArrivalTime);
   const expectedPickupTime = normalizeOptionalTime(body.expectedPickupTime);
+  const requestedBoxType = normalizeOptionalBoxType(body.boxType);
   const notes = normalizeOptionalString(body.notes);
   const stayType = getStayType(startDate, endDate);
 
-  const availabilityCheck = await checkAvailability(
+  if (
+    typeof body.boxType === "string" &&
+    body.boxType.trim() !== "" &&
+    !requestedBoxType
+  ) {
+    return NextResponse.json(
+      { error: "Tipologia box non valida." },
+      { status: 400 },
+    );
+  }
+
+  if (!expectedPickupTime) {
+    return NextResponse.json(
+      { error: "Inserisci l'orario previsto di ritiro." },
+      { status: 400 },
+    );
+  }
+
+  const estimate = calculateBookingEstimate({
+    startDate,
+    endDate,
+    dogs,
+    extraServiceIds,
+    expectedPickupTime,
+  });
+
+  const availabilityCheck = await assignBoxTypeForRange({
     startDate,
     endDate,
     requiredBoxes,
-  );
+    requestedBoxType,
+  });
 
   if (!availabilityCheck.ok) {
     return NextResponse.json(
@@ -537,6 +500,7 @@ export async function POST(request: NextRequest) {
       admin_notes: null,
       confirmed_at: null,
       box_count: requiredBoxes,
+      box_type: requestedBoxType,
       estimated_price_cents: estimate.isComplete ? estimate.totalCents : null,
       estimated_price_details: estimate,
       selected_extra_services: estimate.selectedExtras,

@@ -7,6 +7,7 @@ export type ListinoPriceRow = {
   billingUnit?: "per_day" | "per_night" | "per_day_per_dog" | "per_dog_once" | "per_booking";
   dogSize?: DogSize;
   estimateLabel?: string;
+  selectable?: boolean;
 };
 
 export type ListinoPromotion = {
@@ -21,7 +22,8 @@ export type ExtraServiceId =
   | "facility_food"
   | "medicine_administration"
   | "bath_before_pickup"
-  | "local_transport";
+  | "local_transport"
+  | "late_pickup";
 
 export type BookingPricingConfig = {
   maxDogsPerBooking: number;
@@ -131,7 +133,20 @@ export const extraServices: ListinoPriceRow[] = [
     billingUnit: "per_booking",
     estimateLabel: "Stima calcolata dalla tariffa minima",
   },
+  {
+    id: "late_pickup",
+    service: "Late pickup",
+    details: "Ritiro dopo le 11:00.",
+    price: "EUR 10",
+    amountCents: 1000,
+    billingUnit: "per_booking",
+    selectable: false,
+  },
 ];
+
+export const selectableExtraServices = extraServices.filter(
+  (service) => service.selectable !== false,
+);
 
 export const promotions: ListinoPromotion[] = [
   {
@@ -148,6 +163,7 @@ export const promotions: ListinoPromotion[] = [
 ];
 
 export const conditions: string[] = [
+  "La struttura dispone di 3 box esterni in area dedicata con giardino privato e di ulteriori box interni situati in una zona separata e coperta. La scelta del box viene assegnata in base all’ordine di arrivo delle prenotazioni. In assenza di preferenze espresse dal proprietario, la struttura assegnerà prioritariamente i box esterni e, successivamente, quelli interni.",
   "Le tariffe sono indicative e possono variare in base a periodo, durata del soggiorno e necessita specifiche del cane.",
   "Ogni prenotazione occupa un solo box. Piu cani possono stare nella stessa prenotazione solo se compatibili tra loro e appartenenti allo stesso nucleo familiare.",
   "Per soggiorni notturni il giorno di uscita non viene conteggiato come notte, salvo permanenza prolungata oltre l'orario concordato.",

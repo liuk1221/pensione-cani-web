@@ -6,11 +6,13 @@ import {
 } from "@/lib/email/booking-emails";
 import {
   bookingPricing,
-  extraServices,
+  selectableExtraServices,
   type DogSize,
 } from "@/lib/listino-config";
 import { calculateBookingEstimate } from "@/lib/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { assignBoxTypeForRange } from "@/lib/box-availability";
+import { normalizeOptionalBoxType } from "@/lib/box-types";
 
 type DogPayload = {
   name?: unknown;
@@ -34,6 +36,7 @@ type ManualBookingBody = {
   phone?: unknown;
   expectedArrivalTime?: unknown;
   expectedPickupTime?: unknown;
+  boxType?: unknown;
 
   dogs?: unknown;
   extraServiceIds?: unknown;
@@ -56,15 +59,6 @@ type NormalizedDog = {
   age: number | null;
   sex: "male" | "female" | "unknown";
   sterilized: boolean | null;
-};
-
-type AvailabilityRow = {
-  day: string;
-  total_boxes: number;
-  occupied_boxes: number;
-  blocked_boxes: number;
-  available_boxes: number;
-  status: "available" | "limited" | "full" | "closed";
 };
 
 type BookingDogRow = {
@@ -107,6 +101,7 @@ const adminBookingsSelect = `
   end_date,
   expected_arrival_time,
   expected_pickup_time,
+  box_type,
   notes,
   admin_notes,
   created_at,
@@ -258,18 +253,6 @@ function getStayType(startDate: string, endDate: string) {
   return startDate === endDate ? "day_care" : "overnight";
 }
 
-function getOccupiedDays(
-  rows: AvailabilityRow[],
-  startDate: string,
-  endDate: string,
-) {
-  if (startDate === endDate) {
-    return rows.filter((row) => row.day === startDate);
-  }
-
-  return rows.filter((row) => row.day >= startDate && row.day <= endDate);
-}
-
 function normalizeDogs(body: ManualBookingBody) {
   const rawDogs = Array.isArray(body.dogs)
     ? (body.dogs as DogPayload[])
@@ -338,7 +321,9 @@ function normalizeExtraServiceIds(value: unknown) {
     return [];
   }
 
-  const allowedIds = new Set(extraServices.map((service) => service.id));
+  const allowedIds = new Set(
+    selectableExtraServices.map((service) => service.id),
+  );
 
   return Array.from(
     new Set(
@@ -352,49 +337,6 @@ function normalizeExtraServiceIds(value: unknown) {
 
 function getRequiredBoxes(dogCount: number) {
   return dogCount > 0 ? 1 : 0;
-}
-
-async function checkAvailability(
-  startDate: string,
-  endDate: string,
-  requiredBoxes: number,
-) {
-  const { data, error } = await supabaseAdmin.rpc("get_public_availability", {
-    from_date: startDate,
-    to_date: endDate,
-  });
-
-  if (error) {
-    console.error("Manual booking availability check error:", error);
-
-    return {
-      ok: false,
-      error: "Errore durante la verifica della disponibilita.",
-      status: 500,
-    };
-  }
-
-  const rows = (data ?? []) as AvailabilityRow[];
-  const occupiedDays = getOccupiedDays(rows, startDate, endDate);
-
-  const unavailableDay = occupiedDays.find(
-    (day) =>
-      day.status === "closed" || day.available_boxes < requiredBoxes,
-  );
-
-  if (unavailableDay) {
-    return {
-      ok: false,
-      error: `Impossibile inserire la prenotazione confermata: la data ${unavailableDay.day} non ha slot disponibili.`,
-      status: 409,
-    };
-  }
-
-  return {
-    ok: true,
-    error: null,
-    status: 200,
-  };
 }
 
 async function getAdminNotificationRecipients() {
@@ -457,10 +399,11 @@ export async function GET() {
   const bookings = (data ?? []).map((booking) => ({
     ...booking,
     id: String(booking.id),
-    expected_arrival_time:
+  expected_arrival_time:
       "expected_arrival_time" in booking ? booking.expected_arrival_time : null,
     expected_pickup_time:
       "expected_pickup_time" in booking ? booking.expected_pickup_time : null,
+    box_type: "box_type" in booking ? booking.box_type : null,
     box_count: "box_count" in booking ? booking.box_count : null,
     estimated_price_cents:
       "estimated_price_cents" in booking ? booking.estimated_price_cents : null,
@@ -604,25 +547,49 @@ export async function POST(request: NextRequest) {
   const extraServiceIds = normalizeExtraServiceIds(body.extraServiceIds);
   const expectedArrivalTime = normalizeOptionalTime(body.expectedArrivalTime);
   const expectedPickupTime = normalizeOptionalTime(body.expectedPickupTime);
+  const requestedBoxType = normalizeOptionalBoxType(body.boxType);
   const ownerName = String(body.ownerName).trim();
   const ownerSurname = String(body.ownerSurname).trim();
   const ownerEmail = normalizeEmailForDb(body.email);
   const ownerPhone = normalizeRequiredDbString(body.phone);
   const notes = normalizeOptionalString(body.notes);
   const stayType = getStayType(startDate, endDate);
+
+  if (!expectedPickupTime) {
+    return NextResponse.json(
+      { error: "Inserisci l'orario previsto di ritiro." },
+      { status: 400 },
+    );
+  }
+
+  if (
+    typeof body.boxType === "string" &&
+    body.boxType.trim() !== "" &&
+    !requestedBoxType
+  ) {
+    return NextResponse.json(
+      { error: "Tipologia box non valida." },
+      { status: 400 },
+    );
+  }
+
   const estimate = calculateBookingEstimate({
     startDate,
     endDate,
     dogs,
     extraServiceIds,
+    expectedPickupTime,
   });
 
+  let assignedBoxType = requestedBoxType;
+
   if (status === "confirmed") {
-    const availabilityCheck = await checkAvailability(
+    const availabilityCheck = await assignBoxTypeForRange({
       startDate,
       endDate,
       requiredBoxes,
-    );
+      requestedBoxType,
+    });
 
     if (!availabilityCheck.ok) {
       return NextResponse.json(
@@ -630,6 +597,8 @@ export async function POST(request: NextRequest) {
         { status: availabilityCheck.status },
       );
     }
+
+    assignedBoxType = availabilityCheck.boxType;
   }
 
   const { data: customer, error: customerError } = await supabaseAdmin
@@ -695,6 +664,7 @@ export async function POST(request: NextRequest) {
       admin_notes: normalizeOptionalString(body.adminNotes),
       confirmed_at: status === "confirmed" ? now : null,
       box_count: requiredBoxes,
+      box_type: assignedBoxType,
       estimated_price_cents: estimate.isComplete ? estimate.totalCents : null,
       estimated_price_details: estimate,
       selected_extra_services: estimate.selectedExtras,
@@ -777,6 +747,7 @@ export async function POST(request: NextRequest) {
         expectedPickupTime,
         stayType,
         source,
+        submittedFromAdmin: true,
         status,
         notes,
       }).catch((emailError) => {

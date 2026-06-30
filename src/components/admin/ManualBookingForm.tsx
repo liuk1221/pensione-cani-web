@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { formatDateKey } from "@/lib/date-utils";
 import {
   bookingPricing,
-  extraServices,
+  selectableExtraServices,
   type DogSize,
 } from "@/lib/listino-config";
 import { calculateBookingEstimate, formatEuro } from "@/lib/pricing";
@@ -69,6 +69,7 @@ export function ManualBookingForm({
   const [selectedExtraServiceIds, setSelectedExtraServiceIds] = useState<
     string[]
   >([]);
+  const [expectedPickupTime, setExpectedPickupTime] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -80,8 +81,9 @@ export function ManualBookingForm({
         endDate,
         dogs,
         extraServiceIds: selectedExtraServiceIds,
+        expectedPickupTime,
       }),
-    [dogs, endDate, selectedExtraServiceIds, startDate],
+    [dogs, endDate, expectedPickupTime, selectedExtraServiceIds, startDate],
   );
 
   function addDog() {
@@ -132,6 +134,12 @@ export function ManualBookingForm({
       return;
     }
 
+    if (!expectedPickupTime) {
+      setError("Inserisci l'orario previsto di ritiro.");
+      setSuccessMessage(null);
+      return;
+    }
+
     const payload = {
       source: String(formData.get("source") ?? "phone"),
       status: String(formData.get("status") ?? "confirmed"),
@@ -144,7 +152,8 @@ export function ManualBookingForm({
       email: String(formData.get("email") ?? ""),
       phone: String(formData.get("phone") ?? ""),
       expectedArrivalTime: String(formData.get("expectedArrivalTime") ?? ""),
-      expectedPickupTime: String(formData.get("expectedPickupTime") ?? ""),
+      expectedPickupTime,
+      boxType: String(formData.get("boxType") ?? ""),
 
       dogs: payloadDogs,
       extraServiceIds: selectedExtraServiceIds,
@@ -178,6 +187,7 @@ export function ManualBookingForm({
       form.reset();
       setDogs([{ id: 1, size: "" }]);
       setSelectedExtraServiceIds([]);
+      setExpectedPickupTime("");
       setAreExtraServicesOpen(false);
 
       setSuccessMessage(
@@ -303,7 +313,7 @@ export function ManualBookingForm({
             Orari previsti
           </h3>
 
-          <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <div className="mt-5 grid gap-5 md:grid-cols-3">
             <Field
               label="Orario previsto di arrivo"
               name="expectedArrivalTime"
@@ -313,6 +323,19 @@ export function ManualBookingForm({
               label="Orario previsto di ritiro"
               name="expectedPickupTime"
               type="time"
+              required
+              value={expectedPickupTime}
+              onChange={setExpectedPickupTime}
+            />
+            <SelectField
+              label="Tipologia box"
+              name="boxType"
+              defaultValue=""
+              options={[
+                ["", "Nessuna preferenza"],
+                ["outdoor", "Box esterno"],
+                ["indoor", "Box interno"],
+              ]}
             />
           </div>
         </div>
@@ -444,7 +467,7 @@ export function ManualBookingForm({
 
           {areExtraServicesOpen ? (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {extraServices.map((service) => {
+              {selectableExtraServices.map((service) => {
                 const id = service.id ?? service.service;
                 const isChecked = selectedExtraServiceIds.includes(id);
 
@@ -555,7 +578,9 @@ function EstimatePanel({
 
       {!estimate.isComplete ? (
         <p className="mt-4 rounded-2xl bg-white p-3 text-sm font-semibold text-slate-700">
-          Inserisci almeno un cane per completare il preventivo.
+          {estimate.dogCount === 0
+            ? "Inserisci almeno un cane per completare il preventivo."
+            : "Inserisci l'orario previsto di ritiro per completare il preventivo."}
         </p>
       ) : (
         <div className="mt-5 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
@@ -581,6 +606,22 @@ function EstimatePanel({
           ) : null}
         </div>
       )}
+
+      {estimate.selectedExtras.length > 0 ? (
+        <div className="mt-4 rounded-2xl bg-white p-4 text-sm text-slate-700">
+          <p className="font-bold text-slate-950">Servizi calcolati</p>
+          <ul className="mt-2 space-y-1">
+            {estimate.selectedExtras.map((service) => (
+              <li key={service.id} className="flex justify-between gap-3">
+                <span>{service.service}</span>
+                <span className="font-bold text-blue-950">
+                  {formatEuro(service.totalCents)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {estimate.hasMinimumPriceServices ? (
         <p className="mt-4 text-xs leading-5 text-slate-600">
@@ -608,6 +649,8 @@ type FieldProps = {
   required?: boolean;
   min?: string;
   inputMode?: "tel";
+  value?: string;
+  onChange?: (value: string) => void;
 };
 
 function Field({
@@ -617,6 +660,8 @@ function Field({
   required = false,
   min,
   inputMode,
+  value,
+  onChange,
 }: FieldProps) {
   return (
     <div>
@@ -628,6 +673,12 @@ function Field({
         required={required}
         min={min}
         inputMode={inputMode}
+        value={value}
+        onChange={
+          onChange
+            ? (event) => onChange(event.currentTarget.value)
+            : undefined
+        }
         maxLength={
           type === "email" ? 254 : type === "tel" ? 30 : type === "text" ? 100 : undefined
         }
