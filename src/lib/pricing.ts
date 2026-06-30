@@ -24,9 +24,11 @@ export type BookingEstimate = {
     id: ExtraServiceId;
     service: string;
     amountCents: number;
+    totalCents: number;
     billingUnit: string;
   }>;
   isComplete: boolean;
+  isPickupTimeComplete: boolean;
   hasMinimumPriceServices: boolean;
 };
 
@@ -57,17 +59,60 @@ function getOvernightRateTier(quantity: number) {
   );
 }
 
+export function isLatePickupTime(value: string | null | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  const match = /^(\d{2}):(\d{2})/.exec(value.trim());
+
+  if (!match) {
+    return false;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours > 23 || minutes > 59) {
+    return false;
+  }
+
+  return hours * 60 + minutes > 11 * 60;
+}
+
+function getExtraServiceTotalCents(
+  service: (typeof extraServices)[number],
+  quantity: number,
+  dogCount: number,
+) {
+  const amountCents = service.amountCents ?? 0;
+
+  if (service.billingUnit === "per_day_per_dog") {
+    return amountCents * quantity * dogCount;
+  }
+
+  if (service.billingUnit === "per_dog_once") {
+    return amountCents * dogCount;
+  }
+
+  return amountCents;
+}
+
 export function calculateBookingEstimate(params: {
   startDate: string;
   endDate: string;
   dogs: EstimateDog[];
   extraServiceIds: string[];
+  expectedPickupTime?: string | null;
 }): BookingEstimate {
   const stayType = getStayType(params.startDate, params.endDate);
   const quantity = getStayQuantity(params.startDate, params.endDate);
   const validDogs = params.dogs.slice(0, bookingPricing.maxDogsPerBooking);
   const dogCount = validDogs.length;
-  const isComplete = dogCount > 0;
+  const isPickupTimeComplete =
+    typeof params.expectedPickupTime === "string" &&
+    params.expectedPickupTime.trim().length > 0;
+  const isComplete = dogCount > 0 && isPickupTimeComplete;
   const overnightRateTier =
     stayType === "overnight" ? getOvernightRateTier(quantity) : null;
   const overnightUnitRateCents = overnightRateTier?.amountCents ?? null;
@@ -100,26 +145,32 @@ export function calculateBookingEstimate(params: {
   const baseSubtotalCents =
     baseBeforeSharedBoxDiscount - secondDogDiscountCents;
 
+  const selectedExtraServiceIds = new Set(
+    params.extraServiceIds.filter((id) => id !== "late_pickup"),
+  );
+
+  if (isLatePickupTime(params.expectedPickupTime)) {
+    selectedExtraServiceIds.add("late_pickup");
+  }
+
   const selectedExtras = extraServices
-    .filter((service) => params.extraServiceIds.includes(service.id ?? ""))
-    .map((service) => ({
-      id: service.id as ExtraServiceId,
-      service: service.service,
-      amountCents: service.amountCents ?? 0,
-      billingUnit: service.billingUnit ?? "per_booking",
-    }));
+    .filter((service) => selectedExtraServiceIds.has(service.id ?? ""))
+    .map((service) => {
+      const amountCents = service.amountCents ?? 0;
 
-  const extrasSubtotalCents = selectedExtras.reduce((total, service) => {
-    if (service.billingUnit === "per_day_per_dog") {
-      return total + service.amountCents * quantity * dogCount;
-    }
+      return {
+        id: service.id as ExtraServiceId,
+        service: service.service,
+        amountCents,
+        totalCents: getExtraServiceTotalCents(service, quantity, dogCount),
+        billingUnit: service.billingUnit ?? "per_booking",
+      };
+    });
 
-    if (service.billingUnit === "per_dog_once") {
-      return total + service.amountCents * dogCount;
-    }
-
-    return total + service.amountCents;
-  }, 0);
+  const extrasSubtotalCents = selectedExtras.reduce(
+    (total, service) => total + service.totalCents,
+    0,
+  );
 
   const hasMinimumPriceServices = selectedExtras.some((service) =>
     ["bath_before_pickup", "local_transport"].includes(service.id),
@@ -138,6 +189,7 @@ export function calculateBookingEstimate(params: {
     totalCents: baseSubtotalCents + extrasSubtotalCents,
     selectedExtras,
     isComplete,
+    isPickupTimeComplete,
     hasMinimumPriceServices,
   };
 }

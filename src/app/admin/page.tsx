@@ -41,7 +41,7 @@ async function getAdminDashboardData() {
       .select("status, stay_type, start_date, end_date, booking_dogs ( dog_id )"),
     supabaseAdmin
       .from("app_settings")
-      .select("total_boxes")
+      .select("total_boxes, outdoor_boxes, indoor_boxes")
       .eq("id", 1)
       .single(),
   ]);
@@ -69,7 +69,10 @@ async function getAdminDashboardData() {
     confirmedCount: confirmedBookings.length,
     totalCount: bookings.length,
     activeTodayCount,
-    totalBoxes: settingsResponse.data?.total_boxes ?? 0,
+    totalBoxes:
+      (settingsResponse.data?.outdoor_boxes ??
+        settingsResponse.data?.total_boxes ??
+        0) + (settingsResponse.data?.indoor_boxes ?? 0),
     hasError: errors.length > 0,
   };
 }

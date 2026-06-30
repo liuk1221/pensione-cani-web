@@ -3,10 +3,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import { formatDateKey } from "@/lib/date-utils";
 import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
+import { getBoxTypeLabel } from "@/lib/box-types";
 
 type Settings = {
   id: number;
   total_boxes: number;
+  outdoor_boxes: number | null;
+  indoor_boxes: number | null;
   business_email: string | null;
   notification_email: string | null;
 };
@@ -22,6 +25,7 @@ type AvailabilityOverride = {
   id: string;
   date: string;
   blocked_boxes: number;
+  box_type: string | null;
   reason: string | null;
   created_at: string;
 };
@@ -95,7 +99,8 @@ export default function AdminDisponibilitaPage() {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
-    const totalBoxes = Number(formData.get("totalBoxes"));
+    const outdoorBoxes = Number(formData.get("outdoorBoxes"));
+    const indoorBoxes = Number(formData.get("indoorBoxes"));
 
     try {
       setIsSavingSettings(true);
@@ -108,7 +113,8 @@ export default function AdminDisponibilitaPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          totalBoxes,
+          outdoorBoxes,
+          indoorBoxes,
         }),
       });
 
@@ -123,6 +129,8 @@ export default function AdminDisponibilitaPage() {
           ? {
               ...current,
               total_boxes: payload.settings.total_boxes,
+              outdoor_boxes: payload.settings.outdoor_boxes,
+              indoor_boxes: payload.settings.indoor_boxes,
             }
           : current,
       );
@@ -189,6 +197,7 @@ export default function AdminDisponibilitaPage() {
 
     const date = String(formData.get("date") ?? "");
     const blockedBoxes = Number(formData.get("blockedBoxes"));
+    const boxType = String(formData.get("boxType") ?? "");
     const reason = String(formData.get("reason") ?? "");
 
     try {
@@ -203,6 +212,7 @@ export default function AdminDisponibilitaPage() {
         body: JSON.stringify({
           date,
           blockedBoxes,
+          boxType,
           reason,
         }),
       });
@@ -395,7 +405,7 @@ export default function AdminDisponibilitaPage() {
           <div className="space-y-8">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-bold text-slate-950">
-                Numero totale box
+                Numero box
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -404,7 +414,45 @@ export default function AdminDisponibilitaPage() {
               </p>
 
               <form onSubmit={handleSettingsSubmit} className="mt-6 space-y-5">
-                <div>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700">
+                      Box esterni
+                    </label>
+
+                    <input
+                      name="outdoorBoxes"
+                      type="number"
+                      min="0"
+                      required
+                      defaultValue={
+                        settings?.outdoor_boxes ?? settings?.total_boxes ?? 0
+                      }
+                      className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700">
+                      Box interni
+                    </label>
+
+                    <input
+                      name="indoorBoxes"
+                      type="number"
+                      min="0"
+                      required
+                      defaultValue={settings?.indoor_boxes ?? 0}
+                      className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                    />
+                  </div>
+                </div>
+
+                <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                  Totale attuale: {settings?.total_boxes ?? 0}
+                </p>
+
+                <div className="hidden">
                   <label className="text-sm font-semibold text-slate-700">
                     Box disponibili totali
                   </label>
@@ -414,6 +462,7 @@ export default function AdminDisponibilitaPage() {
                     type="number"
                     min="0"
                     required
+                    disabled
                     defaultValue={settings?.total_boxes ?? 0}
                     className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
                   />
@@ -515,6 +564,22 @@ export default function AdminDisponibilitaPage() {
 
                 <div>
                   <label className="text-sm font-semibold text-slate-700">
+                    Tipologia box
+                  </label>
+
+                  <select
+                    name="boxType"
+                    defaultValue="outdoor"
+                    required
+                    className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  >
+                    <option value="outdoor">Box esterno</option>
+                    <option value="indoor">Box interno</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-slate-700">
                     Motivo
                   </label>
 
@@ -598,6 +663,9 @@ export default function AdminDisponibilitaPage() {
                         </p>
                         <p className="text-sm text-slate-600">
                           Box bloccati: {item.blocked_boxes}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          Tipologia: {getBoxTypeLabel(item.box_type)}
                         </p>
                         <p className="text-sm text-slate-500">
                           {item.reason ?? "Nessun motivo indicato"}

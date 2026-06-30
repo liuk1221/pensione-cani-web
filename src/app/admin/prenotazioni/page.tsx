@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
+import { getBoxTypeLabel } from "@/lib/box-types";
 
 type BookingStatus =
   | "pending"
@@ -43,6 +44,7 @@ type Booking = {
   end_date: string;
   expected_arrival_time: string | null;
   expected_pickup_time: string | null;
+  box_type: string | null;
   notes: string | null;
   admin_notes: string | null;
   created_at: string;
@@ -1145,6 +1147,10 @@ export default function AdminPrenotazioniPage() {
 
                     <p className="text-sm text-slate-600">
                       Orario ritiro: {formatTime(booking.expected_pickup_time)}
+                    </p>
+
+                    <p className="mt-3 text-sm text-slate-600">
+                      Box: {getBoxTypeLabel(booking.box_type)}
                     </p>
 
                     {booking.status === "pending" ? (

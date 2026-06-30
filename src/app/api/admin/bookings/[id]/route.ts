@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
-import { getDateKeysInRange } from "@/lib/date-utils";
+import { assignBoxTypeForRange } from "@/lib/box-availability";
+import { normalizeOptionalBoxType } from "@/lib/box-types";
 import { sendBookingStatusEmail } from "@/lib/email/booking-emails";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -39,6 +40,7 @@ type CurrentBooking = {
   start_date: string;
   end_date: string;
   box_count: number | null;
+  box_type: string | null;
   customer: BookingRelation<BookingCustomer>;
   dog: BookingRelation<BookingDog>;
   booking_dogs: BookingDogLink[] | null;
@@ -54,15 +56,6 @@ type BookingToDelete = {
   customer: BookingRelation<BookingCustomer>;
   dog: BookingRelation<BookingDog>;
   booking_dogs: BookingDogLink[] | null;
-};
-
-type AvailabilityRow = {
-  day: string;
-  total_boxes: number;
-  occupied_boxes: number;
-  blocked_boxes: number;
-  available_boxes: number;
-  status: "available" | "limited" | "full" | "closed";
 };
 
 function isBookingStatus(value: unknown): value is BookingStatus {
@@ -88,16 +81,6 @@ function normalizeOptionalString(value: unknown) {
 
 function getStayType(startDate: string, endDate: string) {
   return startDate === endDate ? "day_care" : "overnight";
-}
-
-function getStayDays(startDate: string, endDate: string) {
-  if (startDate === endDate) {
-    return [startDate];
-  }
-
-  return getDateKeysInRange(startDate, endDate, {
-    includeEnd: true,
-  });
 }
 
 function getSingleRelation<T>(relation: BookingRelation<T>) {
@@ -172,56 +155,6 @@ async function getLinkedBookingDogs(bookingId: string) {
   }));
 }
 
-async function checkAvailabilityBeforeConfirm(
-  startDate: string,
-  endDate: string,
-  requiredBoxes: number,
-) {
-  const { data, error } = await supabaseAdmin.rpc("get_public_availability", {
-    from_date: startDate,
-    to_date: endDate,
-  });
-
-  if (error) {
-    console.error("Availability check before confirm error:", error);
-
-    return {
-      ok: false,
-      error: "Errore durante la verifica della disponibilita.",
-      unavailableDays: [],
-      status: 500,
-    };
-  }
-
-  const rows = (data ?? []) as AvailabilityRow[];
-  const rowsByDay = new Map(rows.map((row) => [row.day, row]));
-  const unavailableDays = getStayDays(startDate, endDate).filter((day) => {
-    const availability = rowsByDay.get(day);
-
-    return (
-      !availability ||
-      availability.status === "closed" ||
-      availability.available_boxes < requiredBoxes
-    );
-  });
-
-  if (unavailableDays.length > 0) {
-    return {
-      ok: false,
-      error: `Impossibile confermare: non ci sono slot disponibili per ${unavailableDays.join(", ")}.`,
-      unavailableDays,
-      status: 409,
-    };
-  }
-
-  return {
-    ok: true,
-    error: null,
-    unavailableDays: [],
-    status: 200,
-  };
-}
-
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -269,6 +202,7 @@ export async function PATCH(
         start_date,
         end_date,
         box_count,
+        box_type,
         customer:customers (
           first_name,
           last_name,
@@ -310,12 +244,15 @@ export async function PATCH(
     );
   }
 
+  let assignedBoxType = normalizeOptionalBoxType(booking.box_type);
+
   if (body.status === "confirmed" && booking.status !== "confirmed") {
-    const availabilityCheck = await checkAvailabilityBeforeConfirm(
-      nextStartDate,
-      nextEndDate,
-      booking.box_count ?? 1,
-    );
+    const availabilityCheck = await assignBoxTypeForRange({
+      startDate: nextStartDate,
+      endDate: nextEndDate,
+      requiredBoxes: booking.box_count ?? 1,
+      requestedBoxType: normalizeOptionalBoxType(booking.box_type),
+    });
 
     if (!availabilityCheck.ok) {
       return NextResponse.json(
@@ -326,6 +263,8 @@ export async function PATCH(
         { status: availabilityCheck.status },
       );
     }
+
+    assignedBoxType = availabilityCheck.boxType;
   }
 
   const now = new Date().toISOString();
@@ -346,6 +285,7 @@ export async function PATCH(
     updatePayload.start_date = nextStartDate;
     updatePayload.end_date = nextEndDate;
     updatePayload.stay_type = getStayType(nextStartDate, nextEndDate);
+    updatePayload.box_type = assignedBoxType;
   }
 
   if (body.status === "rejected") {
@@ -364,7 +304,7 @@ export async function PATCH(
     .from("bookings")
     .update(updatePayload)
     .eq("id", id)
-    .select("id, status, admin_notes, stay_type, start_date, end_date")
+    .select("id, status, admin_notes, stay_type, start_date, end_date, box_type")
     .single();
 
   if (error) {
