@@ -60,9 +60,9 @@ const processSteps = [
 
 const serviceFaqs = [
   {
-    question: "Che differenza c'e tra asilo giornaliero e pensione notturna?",
+    question: "Che differenza c'è tra asilo giornaliero e pensione notturna?",
     answer:
-      "L'asilo giornaliero e pensato per permanenze diurne senza pernottamento. La pensione notturna include il soggiorno con box dedicato, gestione quotidiana e uscita concordata.",
+      "L'asilo giornaliero è pensato per permanenze diurne senza pernottamento. La pensione notturna include il soggiorno con box dedicato, gestione quotidiana e uscita concordata.",
   },
   {
     question: "Accogliete cani alla prima esperienza in pensione?",
@@ -72,7 +72,7 @@ const serviceFaqs = [
   {
     question: "Due cani della stessa famiglia possono stare insieme?",
     answer:
-      "Possono condividere lo stesso box solo se sono compatibili, abituati a stare insieme e se la soluzione e sicura per entrambi.",
+      "Possono condividere lo stesso box solo se sono compatibili, abituati a stare insieme e se la soluzione è sicura per entrambi.",
   },
 ];
 
