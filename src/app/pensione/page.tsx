@@ -1,6 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { siteConfig } from "@/lib/site-config";
+import { createPageMetadata } from "@/lib/seo";
+
+export const metadata = createPageMetadata({
+  title: "La pensione per cani a Fabriano",
+  description:
+    "Scopri la pensione per cani Pirella Pet Resort a Fabriano: box dedicati, aree esterne recintate, routine quotidiana e cura personalizzata.",
+  path: "/pensione",
+  image: "/asset/Struttura_2.jpg",
+});
 
 const structureSections = [
   {

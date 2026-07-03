@@ -4,6 +4,14 @@ import {
   type ListinoPriceRow,
   type ListinoPromotion,
 } from "../../lib/listino-config";
+import { createPageMetadata } from "@/lib/seo";
+
+export const metadata = createPageMetadata({
+  title: "Listino prezzi pensione cani",
+  description:
+    "Prezzi indicativi per pensione cani a Fabriano: asilo giornaliero, pensione notturna, soggiorni lunghi, box condiviso famiglia e servizi extra.",
+  path: "/listino",
+});
 
 type PriceSection = {
   title: string;
@@ -91,6 +99,24 @@ export default function ListinoPage() {
       description:
         "Servizi opzionali da concordare al momento della richiesta o prima dell'ingresso.",
       rows: listinoConfig.extraServices,
+    },
+  ];
+
+  const priceFaqs = [
+    {
+      question: "Quanto costa la pensione notturna per cani?",
+      answer:
+        "Le tariffe partono da EUR 20 a notte per soggiorni brevi e scendono per permanenze continuative piu lunghe, secondo il listino indicato in pagina.",
+    },
+    {
+      question: "Quanto costa lasciare il cane durante il giorno?",
+      answer:
+        "La pensione giornaliera parte da EUR 15, mentre la mezza giornata parte da EUR 10, salvo servizi extra o esigenze specifiche.",
+    },
+    {
+      question: "Il prezzo finale è sempre quello del listino?",
+      answer:
+        "Il listino è indicativo. La conferma finale dipende da periodo, durata, disponibilita, necessita del cane e servizi richiesti.",
     },
   ];
 
@@ -208,6 +234,30 @@ export default function ListinoPage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="mt-10 rounded-[2rem] border border-slate-200 bg-white p-6 sm:p-8">
+        <div className="max-w-3xl">
+          <p className="text-sm font-bold uppercase tracking-wide text-blue-700">
+            Domande frequenti sui prezzi
+          </p>
+          <h2 className="mt-3 text-3xl font-bold text-slate-950">
+            Risposte rapide sul costo della pensione per cani
+          </h2>
+        </div>
+
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+          {priceFaqs.map((faq) => (
+            <article key={faq.question} className="rounded-3xl bg-slate-50 p-5">
+              <h3 className="text-lg font-bold text-slate-950">
+                {faq.question}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {faq.answer}
+              </p>
+            </article>
+          ))}
+        </div>
       </section>
     </section>
   );

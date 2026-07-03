@@ -1,4 +1,12 @@
 import { siteConfig } from "@/lib/site-config";
+import { createPageMetadata } from "@/lib/seo";
+
+export const metadata = createPageMetadata({
+  title: "Contatti pensione cani Fabriano",
+  description:
+    "Contatta Pirella Pet Resort, pensione per cani a Fabriano in Frazione Melano 140M. Telefono, WhatsApp, email e indicazioni Google Maps.",
+  path: "/contatti",
+});
 
 const encodedAddress = encodeURIComponent(
   `${siteConfig.name}, ${siteConfig.address}`,

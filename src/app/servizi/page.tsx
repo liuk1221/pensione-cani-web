@@ -1,4 +1,12 @@
 import Link from "next/link";
+import { createPageMetadata } from "@/lib/seo";
+
+export const metadata = createPageMetadata({
+  title: "Servizi di pensione e asilo per cani",
+  description:
+    "Servizi per cani a Fabriano: pensione notturna, asilo giornaliero, aree esterne, sgambamento e gestione personalizzata del soggiorno.",
+  path: "/servizi",
+});
 
 const mainServices = [
   {
@@ -47,6 +55,24 @@ const processSteps = [
     title: "Conferma",
     description:
       "La prenotazione diventa effettiva solo dopo conferma da parte della struttura.",
+  },
+];
+
+const serviceFaqs = [
+  {
+    question: "Che differenza c'e tra asilo giornaliero e pensione notturna?",
+    answer:
+      "L'asilo giornaliero e pensato per permanenze diurne senza pernottamento. La pensione notturna include il soggiorno con box dedicato, gestione quotidiana e uscita concordata.",
+  },
+  {
+    question: "Accogliete cani alla prima esperienza in pensione?",
+    answer:
+      "Si, quando possibile valutiamo un inserimento graduale e raccogliamo informazioni su abitudini, carattere, alimentazione e necessita specifiche.",
+  },
+  {
+    question: "Due cani della stessa famiglia possono stare insieme?",
+    answer:
+      "Possono condividere lo stesso box solo se sono compatibili, abituati a stare insieme e se la soluzione e sicura per entrambi.",
   },
 ];
 
@@ -148,6 +174,31 @@ export default function ServiziPage() {
               </h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {step.description}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-10 rounded-[2rem] border border-slate-200 bg-white p-6 sm:p-8">
+        <div className="max-w-3xl">
+          <p className="text-sm font-bold uppercase tracking-wide text-blue-700">
+            Domande frequenti
+          </p>
+
+          <h2 className="mt-3 text-3xl font-bold text-slate-950">
+            Cosa sapere prima di scegliere il servizio
+          </h2>
+        </div>
+
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+          {serviceFaqs.map((faq) => (
+            <article key={faq.question} className="rounded-3xl bg-slate-50 p-5">
+              <h3 className="text-lg font-bold text-slate-950">
+                {faq.question}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {faq.answer}
               </p>
             </article>
           ))}

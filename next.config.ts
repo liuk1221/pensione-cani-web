@@ -13,6 +13,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  "frame-src 'self' https://www.google.com",
   "frame-ancestors 'none'",
   ...(!isDevelopment ? ["upgrade-insecure-requests"] : []),
 ].join("; ");

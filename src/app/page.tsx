@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { SectionTitle } from "@/components/ui/SectionTitle";
 import { HeroSlideshow } from "@/components/home/HeroSlideshow";
+import { createPageMetadata } from "@/lib/seo";
+
+export const metadata = createPageMetadata({
+  title: "Pensione per cani a Fabriano",
+  description:
+    "Pirella Pet Resort e una pensione per cani a Fabriano con box dedicati, aree esterne, asilo giornaliero, soggiorni notturni e prenotazioni online.",
+  path: "",
+});
 
 const services = [
   {
@@ -40,6 +48,24 @@ const availabilityPreview = [
     label: "Completo",
     color: "bg-red-500",
     description: "nessuno slot libero",
+  },
+];
+
+const homeFaqs = [
+  {
+    question: "Dove si trova Pirella Pet Resort?",
+    answer:
+      "Pirella Pet Resort si trova in Frazione Melano 140M a Fabriano, in provincia di Ancona, all'interno del contesto verde del Circolo Ippico La Pirella.",
+  },
+  {
+    question: "La struttura offre pensione notturna per cani?",
+    answer:
+      "Si. La struttura accoglie cani per soggiorni con pernottamento, con box dedicato, routine quotidiana, aree esterne e conferma manuale della prenotazione.",
+  },
+  {
+    question: "Posso richiedere disponibilita online?",
+    answer:
+      "Si. Dal modulo prenotazioni puoi scegliere il periodo, inserire le informazioni del cane e ricevere una prima email di riepilogo. La richiesta diventa effettiva dopo conferma della struttura.",
   },
 ];
 
@@ -179,6 +205,32 @@ export default function HomePage() {
           >
             Vai al modulo
           </Link>
+        </div>
+      </section>
+
+      <section className="bg-white px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <SectionTitle
+            eyebrow="Domande frequenti"
+            title="Alcune risposte rapide alle domande più frequenti"
+            description="Le informazioni essenziali per capire dove siamo, come funziona la richiesta e quali soggiorni possiamo gestire."
+          />
+
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {homeFaqs.map((faq) => (
+              <article
+                key={faq.question}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-6"
+              >
+                <h3 className="text-lg font-bold text-slate-950">
+                  {faq.question}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  {faq.answer}
+                </p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
     </>

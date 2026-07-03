@@ -4,9 +4,16 @@ import {
   getPublicAvailability,
 } from "@/lib/availability";
 import type { DayAvailability } from "@/lib/availability-types";
+import { createPageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const metadata = createPageMetadata({
+  title: "Prenotazione pensione cani online",
+  description:
+    "Richiedi online la disponibilita per la pensione cani Pirella Pet Resort a Fabriano. Seleziona le date e invia le informazioni del cane.",
+  path: "/prenotazioni",
+});
 
 export default async function PrenotazioniPage() {
   const availabilityRange = getDefaultAvailabilityRange();
