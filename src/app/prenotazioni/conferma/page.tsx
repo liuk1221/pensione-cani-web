@@ -1,5 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Coriandoli } from "@/components/ui/Coriandoli";
+
+export const metadata: Metadata = {
+  title: "Richiesta prenotazione ricevuta",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function ConfermaPrenotazionePage() {
   return (

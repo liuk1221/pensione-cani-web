@@ -1,4 +1,13 @@
 import Image from "next/image";
+import { createPageMetadata } from "@/lib/seo";
+
+export const metadata = createPageMetadata({
+  title: "Gallery della pensione per cani",
+  description:
+    "Foto e video di Pirella Pet Resort a Fabriano: box per cani, aree esterne recintate, spazi personali e struttura immersa nel verde.",
+  path: "/gallery",
+  image: "/asset/Struttura_1.jpg",
+});
 
 const galleryImages = [
   { src: "/asset/Dog_1.jpg", alt: "Due pastori tedeschi nel loro box esterno", title: "Ospiti a quattro zampe", description: "Momenti tranquilli nei box con area esterna dedicata.", layout: "sm:col-span-2 lg:row-span-2", aspect: "aspect-[4/5] lg:aspect-auto lg:min-h-[44rem]", position: "object-[center_68%]" },
