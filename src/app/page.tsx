@@ -60,7 +60,7 @@ const homeFaqs = [
   {
     question: "La struttura offre pensione notturna per cani?",
     answer:
-      "Si. La struttura accoglie cani per soggiorni con pernottamento, con box dedicato, routine quotidiana, aree esterne e conferma manuale della prenotazione.",
+      "Si. La struttura accoglie cani per soggiorni con pernottamento, con box dedicato, routine quotidiana, aree esterne e molto altro!",
   },
   {
     question: "Posso richiedere disponibilita online?",
