@@ -12,7 +12,7 @@ export default async function AdminLoginPage({
   const params = await searchParams;
   const redirectTo = params.redirectTo?.startsWith("/admin")
     ? params.redirectTo
-    : "/admin";
+    : "/admin/prenotazioni";
 
   return (
     <section className="mx-auto flex min-h-[70vh] max-w-7xl items-center justify-center px-4 py-20 sm:px-6 lg:px-8">

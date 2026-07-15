@@ -13,6 +13,7 @@ type ResponsiveDialogProps = {
   cancelLabel?: string;
   isConfirming?: boolean;
   tone?: ResponsiveDialogTone;
+  size?: "default" | "wide";
   onConfirm?: () => void;
   onClose: () => void;
 };
@@ -25,6 +26,7 @@ export function ResponsiveDialog({
   cancelLabel = "Chiudi",
   isConfirming = false,
   tone = "default",
+  size = "default",
   onConfirm,
   onClose,
 }: ResponsiveDialogProps) {
@@ -70,7 +72,9 @@ export function ResponsiveDialog({
       <div
         aria-labelledby="responsive-dialog-title"
         aria-modal="true"
-        className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+        className={`w-full rounded-3xl bg-white p-6 shadow-2xl sm:p-8 ${
+          size === "wide" ? "max-w-6xl" : "max-w-lg"
+        }`}
         role="dialog"
       >
         <h2

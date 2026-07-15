@@ -14,11 +14,13 @@ type SelectionState = "none" | "start" | "end" | "range";
 type AvailabilityCalendarProps = {
   availabilityByDate: Record<string, DayAvailability>;
   mode?: AvailabilityCalendarMode;
+  initialVisibleDate?: string | null;
   selectedStartDate?: string | null;
   selectedEndDate?: string | null;
   onDayClick?: (date: string) => void;
   isDayDisabled?: (date: string, availability?: DayAvailability) => boolean;
   disablePastDates?: boolean;
+  allowedPastDateKeys?: string[];
 };
 
 const monthNames = [
@@ -117,17 +119,27 @@ function getDayClasses(
 export function AvailabilityCalendar({
   availabilityByDate,
   mode = "public",
+  initialVisibleDate = null,
   selectedStartDate = null,
   selectedEndDate = null,
   onDayClick,
   isDayDisabled,
   disablePastDates = mode !== "admin",
+  allowedPastDateKeys = [],
 }: AvailabilityCalendarProps) {
   const today = new Date();
   const todayKey = toDateKey(today);
+  const initialDateParts = initialVisibleDate?.split("-").map(Number);
 
   const [visibleMonth, setVisibleMonth] = useState(
-    new Date(today.getFullYear(), today.getMonth(), 1),
+    initialDateParts?.length === 3 && initialDateParts.every(Number.isFinite)
+      ? new Date(initialDateParts[0], initialDateParts[1] - 1, 1)
+      : new Date(today.getFullYear(), today.getMonth(), 1),
+  );
+
+  const allowedPastDates = useMemo(
+    () => new Set(allowedPastDateKeys),
+    [allowedPastDateKeys],
   );
 
   const year = visibleMonth.getFullYear();
@@ -216,13 +228,18 @@ export function AvailabilityCalendar({
             const dateKey = toDateKey(date);
             const availability = availabilityByDate[dateKey];
 
-            const isPastDate = disablePastDates && dateKey < todayKey;
+            const isPastDate =
+              disablePastDates &&
+              dateKey < todayKey &&
+              !allowedPastDates.has(dateKey);
 
             const status: DayAvailabilityStatus = isPastDate
             ? "past"
             : availability?.status ?? "unknown";
 
-            const selectionState = isPastDate ? "none" : getSelectionState(dateKey);
+            const selectionState = isPastDate
+              ? "none"
+              : getSelectionState(dateKey);
 
             const disabledByRule = isDayDisabled?.(dateKey, availability) ?? false;
             const disabled = isPastDate || disabledByRule;
