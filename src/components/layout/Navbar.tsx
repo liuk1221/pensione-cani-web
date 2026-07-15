@@ -140,16 +140,6 @@ export function Navbar() {
               </Link>
             ))}
 
-            {isAdminArea && (
-              <Link
-                href="/"
-                className="rounded-full bg-yellow-400 px-5 py-3 text-center text-sm font-bold text-blue-950"
-                onClick={() => setIsOpen(false)}
-              >
-                Vai Pubblico
-              </Link>
-            )}
-
             {isAdminArea ? (
               <button
                 type="button"
