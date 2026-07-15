@@ -8,10 +8,6 @@ import Image from "next/image";
 
 const adminNavItems = [
   {
-    label: "Dashboard",
-    href: "/admin",
-  },
-  {
     label: "Prenotazioni",
     href: "/admin/prenotazioni",
   },
@@ -22,6 +18,10 @@ const adminNavItems = [
   {
     label: "Disponibilità",
     href: "/admin/disponibilita",
+  },
+  {
+    label: "Sito Pubblico",
+    href: "/",
   },
 ];
 
@@ -56,7 +56,10 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link href={isAdminArea ? "/admin" : "/"} className="flex items-center gap-3">
+        <Link
+          href={isAdminArea ? "/admin/prenotazioni" : "/"}
+          className="flex items-center gap-3"
+        >
           <div className="relative h-10 w-10 overflow-hidden rounded-full bg-blue-900">
             <Image
               src="/images/logo-pirella-pet-resort-128.png"
@@ -136,6 +139,16 @@ export function Navbar() {
                 {item.label}
               </Link>
             ))}
+
+            {isAdminArea && (
+              <Link
+                href="/"
+                className="rounded-full bg-yellow-400 px-5 py-3 text-center text-sm font-bold text-blue-950"
+                onClick={() => setIsOpen(false)}
+              >
+                Vai Pubblico
+              </Link>
+            )}
 
             {isAdminArea ? (
               <button

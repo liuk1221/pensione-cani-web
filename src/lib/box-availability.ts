@@ -5,6 +5,7 @@ import {
   type BoxType,
 } from "@/lib/box-types";
 import { getDateKeysInRange } from "@/lib/date-utils";
+import type { DayAvailability } from "@/lib/availability-types";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type SettingsRow = {
@@ -37,6 +38,7 @@ type BoxCounts = Record<BoxType, number>;
 type BoxAvailabilityDay = {
   day: string;
   isClosed: boolean;
+  totals: BoxCounts;
   available: BoxCounts;
 };
 
@@ -209,9 +211,58 @@ async function getBoxAvailabilityDays(
     return {
       day,
       isClosed,
+      totals: settingsCounts,
       available,
     };
   });
+}
+
+export async function getBookingEditAvailability(params: {
+  startDate: string;
+  endDate: string;
+  excludeBookingId: string;
+  requestedBoxType?: BoxType | null;
+}) {
+  const days = await getBoxAvailabilityDays(
+    params.startDate,
+    params.endDate,
+    params.excludeBookingId,
+  );
+  const selectedTypes: readonly BoxType[] = params.requestedBoxType
+    ? [params.requestedBoxType]
+    : boxTypes;
+
+  return Object.fromEntries(
+    days.map((day) => {
+      const totalBoxes = selectedTypes.reduce<number>(
+        (total, boxType) => total + day.totals[boxType],
+        0,
+      );
+      const availableBoxes = selectedTypes.reduce<number>(
+        (total, boxType) => total + day.available[boxType],
+        0,
+      );
+      const limitedThreshold = Math.max(1, Math.ceil(totalBoxes * 0.25));
+      const status: DayAvailability["status"] = day.isClosed
+        ? "closed"
+        : availableBoxes <= 0
+          ? "full"
+          : availableBoxes <= limitedThreshold
+            ? "limited"
+            : "available";
+
+      return [
+        day.day,
+        {
+          date: day.day,
+          totalBoxes,
+          occupiedBoxes: Math.max(0, totalBoxes - availableBoxes),
+          availableBoxes,
+          status,
+        } satisfies DayAvailability,
+      ];
+    }),
+  ) as Record<string, DayAvailability>;
 }
 
 function getUnavailableDays(

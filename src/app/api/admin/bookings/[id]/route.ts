@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
-import { assignBoxTypeForRange } from "@/lib/box-availability";
+import {
+  assignBoxTypeForRange,
+  getBookingEditAvailability,
+} from "@/lib/box-availability";
 import { normalizeOptionalBoxType } from "@/lib/box-types";
 import { sendBookingStatusEmail } from "@/lib/email/booking-emails";
+import { calculateBookingEstimate } from "@/lib/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const allowedStatuses = [
@@ -24,6 +28,11 @@ type BookingCustomer = {
 type BookingDog = {
   id?: string | null;
   name: string | null;
+  size?: string | null;
+};
+
+type SelectedExtraService = {
+  id?: unknown;
 };
 
 type BookingRelation<T> = T | T[] | null;
@@ -39,8 +48,11 @@ type CurrentBooking = {
   stay_type: "day_care" | "overnight";
   start_date: string;
   end_date: string;
+  expected_arrival_time: string | null;
+  expected_pickup_time: string | null;
   box_count: number | null;
   box_type: string | null;
+  selected_extra_services: SelectedExtraService[] | null;
   customer: BookingRelation<BookingCustomer>;
   dog: BookingRelation<BookingDog>;
   booking_dogs: BookingDogLink[] | null;
@@ -66,7 +78,45 @@ function isBookingStatus(value: unknown): value is BookingStatus {
 }
 
 function isValidDateKey(value: unknown): value is string {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
+
+function normalizeOptionalTime(value: unknown) {
+  if (value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const match = /^(\d{2}):(\d{2})$/.exec(value.trim());
+
+  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) {
+    return undefined;
+  }
+
+  return `${match[1]}:${match[2]}`;
+}
+
+function getTodayDateKey() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function normalizeOptionalString(value: unknown) {
@@ -112,7 +162,9 @@ function getBookingDogNames(
   return primaryDog?.name ?? "il tuo cane";
 }
 
-async function getLinkedBookingDogs(bookingId: string) {
+async function getLinkedBookingDogs(
+  bookingId: string,
+): Promise<BookingDogLink[]> {
   const { data: links, error: linksError } = await supabaseAdmin
     .from("booking_dogs")
     .select("dog_id")
@@ -137,7 +189,7 @@ async function getLinkedBookingDogs(bookingId: string) {
 
   const { data: dogs, error: dogsError } = await supabaseAdmin
     .from("dogs")
-    .select("id, name")
+    .select("id, name, size")
     .in("id", dogIds);
 
   if (dogsError) {
@@ -153,6 +205,59 @@ async function getLinkedBookingDogs(bookingId: string) {
     dog_id: dogId,
     dog: dogsById.get(dogId) ?? null,
   }));
+}
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const admin = await getCurrentAdmin();
+
+  if (!admin) {
+    return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
+  }
+
+  const { id } = await context.params;
+  const from = request.nextUrl.searchParams.get("from");
+  const to = request.nextUrl.searchParams.get("to");
+
+  if (!isValidDateKey(from) || !isValidDateKey(to) || to < from) {
+    return NextResponse.json(
+      { error: "Intervallo disponibilita non valido." },
+      { status: 400 },
+    );
+  }
+
+  const { data: booking, error } = await supabaseAdmin
+    .from("bookings")
+    .select("id, box_type")
+    .eq("id", id)
+    .single();
+
+  if (error || !booking) {
+    return NextResponse.json(
+      { error: "Prenotazione non trovata." },
+      { status: 404 },
+    );
+  }
+
+  try {
+    const availabilityByDate = await getBookingEditAvailability({
+      startDate: from,
+      endDate: to,
+      excludeBookingId: id,
+      requestedBoxType: normalizeOptionalBoxType(booking.box_type),
+    });
+
+    return NextResponse.json({ availabilityByDate });
+  } catch (availabilityError) {
+    console.error("Booking edit availability error:", availabilityError);
+
+    return NextResponse.json(
+      { error: "Errore durante il caricamento della disponibilita." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function PATCH(
@@ -171,8 +276,11 @@ export async function PATCH(
     status?: unknown;
     adminNotes?: unknown;
     customerMessage?: unknown;
+    updateSchedule?: unknown;
     startDate?: unknown;
     endDate?: unknown;
+    expectedArrivalTime?: unknown;
+    expectedPickupTime?: unknown;
   };
 
   try {
@@ -201,8 +309,11 @@ export async function PATCH(
         stay_type,
         start_date,
         end_date,
+        expected_arrival_time,
+        expected_pickup_time,
         box_count,
         box_type,
+        selected_extra_services,
         customer:customers (
           first_name,
           last_name,
@@ -210,7 +321,8 @@ export async function PATCH(
         ),
         dog:dogs!bookings_dog_id_fkey (
           id,
-          name
+          name,
+          size
         )
       `,
       )
@@ -228,14 +340,70 @@ export async function PATCH(
 
   const booking = currentBooking as CurrentBooking;
   const bookingDogs = await getLinkedBookingDogs(booking.id);
-  const nextStartDate =
-    body.status === "confirmed" && isValidDateKey(body.startDate)
-      ? body.startDate
-      : booking.start_date;
-  const nextEndDate =
-    body.status === "confirmed" && isValidDateKey(body.endDate)
-      ? body.endDate
-      : booking.end_date;
+  const isScheduleUpdate = body.updateSchedule === true;
+
+  if (
+    isScheduleUpdate &&
+    (!isValidDateKey(body.startDate) || !isValidDateKey(body.endDate))
+  ) {
+    return NextResponse.json(
+      { error: "Inserisci un intervallo di date valido." },
+      { status: 400 },
+    );
+  }
+
+  const nextStartDate = isScheduleUpdate
+    ? (body.startDate as string)
+    : booking.start_date;
+  const nextEndDate = isScheduleUpdate
+    ? (body.endDate as string)
+    : booking.end_date;
+  const nextArrivalTime = isScheduleUpdate
+    ? normalizeOptionalTime(body.expectedArrivalTime)
+    : booking.expected_arrival_time?.slice(0, 5) ?? null;
+  const nextPickupTime = isScheduleUpdate
+    ? normalizeOptionalTime(body.expectedPickupTime)
+    : booking.expected_pickup_time?.slice(0, 5) ?? null;
+
+  if (isScheduleUpdate && nextArrivalTime === undefined) {
+    return NextResponse.json(
+      { error: "L'orario di arrivo non e valido." },
+      { status: 400 },
+    );
+  }
+
+  if (isScheduleUpdate && !nextPickupTime) {
+    return NextResponse.json(
+      { error: "Inserisci un orario di ritiro valido." },
+      { status: 400 },
+    );
+  }
+
+  if (
+    isScheduleUpdate &&
+    nextStartDate === nextEndDate &&
+    nextArrivalTime &&
+    typeof nextPickupTime === "string" &&
+    nextPickupTime <= nextArrivalTime
+  ) {
+    return NextResponse.json(
+      { error: "L'orario di ritiro deve essere successivo all'orario di arrivo." },
+      { status: 400 },
+    );
+  }
+
+  const todayKey = getTodayDateKey();
+
+  if (
+    isScheduleUpdate &&
+    booking.start_date < todayKey &&
+    nextStartDate !== booking.start_date
+  ) {
+    return NextResponse.json(
+      { error: "La data di arrivo e gia trascorsa e non puo essere modificata." },
+      { status: 400 },
+    );
+  }
 
   if (nextEndDate < nextStartDate) {
     return NextResponse.json(
@@ -246,12 +414,18 @@ export async function PATCH(
 
   let assignedBoxType = normalizeOptionalBoxType(booking.box_type);
 
-  if (body.status === "confirmed" && booking.status !== "confirmed") {
+  if (
+    (body.status === "confirmed" && booking.status !== "confirmed") ||
+    isScheduleUpdate
+  ) {
+    const availabilityStartDate =
+      booking.start_date < todayKey ? todayKey : nextStartDate;
     const availabilityCheck = await assignBoxTypeForRange({
-      startDate: nextStartDate,
+      startDate: availabilityStartDate,
       endDate: nextEndDate,
       requiredBoxes: booking.box_count ?? 1,
       requestedBoxType: normalizeOptionalBoxType(booking.box_type),
+      excludeBookingId: booking.id,
     });
 
     if (!availabilityCheck.ok) {
@@ -279,13 +453,46 @@ export async function PATCH(
   }
 
   if (body.status === "confirmed") {
-    updatePayload.confirmed_at = now;
+    if (booking.status !== "confirmed") {
+      updatePayload.confirmed_at = now;
+    }
     updatePayload.rejected_at = null;
     updatePayload.cancelled_at = null;
     updatePayload.start_date = nextStartDate;
     updatePayload.end_date = nextEndDate;
     updatePayload.stay_type = getStayType(nextStartDate, nextEndDate);
     updatePayload.box_type = assignedBoxType;
+  }
+
+  if (isScheduleUpdate) {
+    const primaryDog = getSingleRelation(booking.dog);
+    const dogs =
+      bookingDogs.length > 0
+        ? bookingDogs.map((link) => ({ size: getSingleRelation(link.dog)?.size ?? "" }))
+        : [{ size: primaryDog?.size ?? "" }];
+    const extraServiceIds = (booking.selected_extra_services ?? [])
+      .map((service) => service.id)
+      .filter((id): id is string => typeof id === "string");
+    const estimate = calculateBookingEstimate({
+      startDate: nextStartDate,
+      endDate: nextEndDate,
+      dogs,
+      extraServiceIds,
+      expectedPickupTime: nextPickupTime ?? null,
+    });
+
+    updatePayload.start_date = nextStartDate;
+    updatePayload.end_date = nextEndDate;
+    updatePayload.stay_type = getStayType(nextStartDate, nextEndDate);
+    updatePayload.expected_arrival_time = nextArrivalTime;
+    updatePayload.expected_pickup_time = nextPickupTime;
+    updatePayload.estimated_price_cents = estimate.totalCents;
+    updatePayload.estimated_price_details = estimate;
+    updatePayload.selected_extra_services = estimate.selectedExtras;
+
+    if (body.status === "confirmed") {
+      updatePayload.box_type = assignedBoxType;
+    }
   }
 
   if (body.status === "rejected") {
@@ -304,7 +511,9 @@ export async function PATCH(
     .from("bookings")
     .update(updatePayload)
     .eq("id", id)
-    .select("id, status, admin_notes, stay_type, start_date, end_date, box_type")
+    .select(
+      "id, status, admin_notes, stay_type, start_date, end_date, expected_arrival_time, expected_pickup_time, box_type, estimated_price_cents, estimated_price_details, selected_extra_services",
+    )
     .single();
 
   if (error) {

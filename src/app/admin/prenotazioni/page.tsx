@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { BookingScheduleEditor } from "@/components/admin/BookingScheduleEditor";
 import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import { getBoxTypeLabel } from "@/lib/box-types";
 
@@ -145,10 +146,6 @@ function formatTime(value: string | null) {
   return value ? value.slice(0, 5) : "Non indicato";
 }
 
-function isValidDateKey(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
 function formatDateTime(date: string) {
   return new Intl.DateTimeFormat("it-IT", {
     day: "2-digit",
@@ -193,6 +190,49 @@ function getBookingDogNames(booking: Booking) {
   return getBookingDogs(booking)
     .map((dog) => dog.name)
     .join(", ");
+}
+
+function getGoogleCalendarUrl(booking: Booking) {
+  const dogNames = getBookingDogNames(booking);
+  const ownerName = `${booking.customer.first_name} ${booking.customer.last_name}`.trim();
+  const arrivalTime = booking.expected_arrival_time?.slice(0, 5) || "00:00";
+  const pickupTime = booking.expected_pickup_time?.slice(0, 5) || "23:59";
+  const toCalendarDateTime = (date: string, time: string) =>
+    `${date.replaceAll("-", "")}T${time.replace(":", "")}00`;
+  const details = [
+    `Proprietario: ${ownerName}`,
+    `Cane/i: ${dogNames}`,
+    `Telefono: ${booking.customer.phone || "Non indicato"}`,
+    `Email: ${booking.customer.email || "Non indicata"}`,
+    `Permanenza: ${getStayLabel(booking)}`,
+    `Box: ${getBoxTypeLabel(booking.box_type)}`,
+    `Prezzo: ${
+      booking.estimated_price_cents !== null
+        ? formatEuro(booking.estimated_price_cents)
+        : "Non calcolato"
+    }`,
+    `Servizi extra: ${
+      booking.selected_extra_services?.length
+        ? booking.selected_extra_services
+            .map((service) => service.service)
+            .join(", ")
+        : "Nessuno"
+    }`,
+    `Note cliente: ${booking.notes || "Nessuna"}`,
+    `Note admin: ${booking.admin_notes || "Nessuna"}`,
+  ].join("\n");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `Prenotazione ${dogNames} - ${ownerName}`,
+    dates: `${toCalendarDateTime(
+      booking.start_date,
+      arrivalTime,
+    )}/${toCalendarDateTime(booking.end_date, pickupTime)}`,
+    ctz: "Europe/Rome",
+    details,
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 function getTodayDateKey() {
@@ -260,10 +300,6 @@ export default function AdminPrenotazioniPage() {
   const [adminNotesById, setAdminNotesById] = useState<Record<string, string>>(
     {},
   );
-  const [bookingDateEdits, setBookingDateEdits] = useState<
-    Record<string, { startDate: string; endDate: string }>
-  >({});
-
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -291,6 +327,8 @@ export default function AdminPrenotazioniPage() {
   const [customerMessage, setCustomerMessage] = useState("");
   const [bookingPendingDeletion, setBookingPendingDeletion] =
     useState<Booking | null>(null);
+  const [bookingBeingEdited, setBookingBeingEdited] =
+    useState<Booking | null>(null);
 
   const todayKey = getTodayDateKey();
 
@@ -299,17 +337,6 @@ export default function AdminPrenotazioniPage() {
     setAdminNotesById(
       Object.fromEntries(
         nextBookings.map((booking) => [booking.id, booking.admin_notes ?? ""]),
-      ),
-    );
-    setBookingDateEdits(
-      Object.fromEntries(
-        nextBookings.map((booking) => [
-          booking.id,
-          {
-            startDate: booking.start_date,
-            endDate: booking.end_date,
-          },
-        ]),
       ),
     );
   }
@@ -382,24 +409,6 @@ export default function AdminPrenotazioniPage() {
       return;
     }
 
-    const dateEdit = bookingDateEdits[id] ?? {
-      startDate: currentBooking.start_date,
-      endDate: currentBooking.end_date,
-    };
-
-    if (
-      status === "confirmed" &&
-      (!isValidDateKey(dateEdit.startDate) || !isValidDateKey(dateEdit.endDate))
-    ) {
-      setError("Inserisci un intervallo di date valido prima di confermare.");
-      return;
-    }
-
-    if (status === "confirmed" && dateEdit.endDate < dateEdit.startDate) {
-      setError("La data di uscita non puo essere precedente all'arrivo.");
-      return;
-    }
-
     try {
       setUpdatingId(id);
       setError(null);
@@ -414,12 +423,6 @@ export default function AdminPrenotazioniPage() {
           status,
           adminNotes: adminNotesById[id] ?? "",
           customerMessage: messageToCustomer,
-          ...(status === "confirmed"
-            ? {
-                startDate: dateEdit.startDate,
-                endDate: dateEdit.endDate,
-              }
-            : {}),
         }),
       });
 
@@ -1020,10 +1023,6 @@ export default function AdminPrenotazioniPage() {
           {filteredBookings.map((booking) => {
             const isExpanded = expandedId === booking.id;
             const isUpdating = updatingId === booking.id;
-            const dateEdit = bookingDateEdits[booking.id] ?? {
-              startDate: booking.start_date,
-              endDate: booking.end_date,
-            };
             const bookingDogs = getBookingDogs(booking);
             const bookingDogNames = getBookingDogNames(booking);
 
@@ -1061,6 +1060,28 @@ export default function AdminPrenotazioniPage() {
 
                     <div>
                         <div className="mt-6 flex flex-wrap items-center gap-3">
+                            <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => {
+                              setError(null);
+                              setSuccessMessage(null);
+                              setBookingBeingEdited(booking);
+                            }}
+                            className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                            Modifica date e orari
+                            </button>
+
+                            <a
+                            href={getGoogleCalendarUrl(booking)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 transition hover:border-[#34A853] hover:bg-[#E6F4EA] hover:text-[#137333]"
+                            >
+                            Salva in Google Calendar
+                            </a>
+
                             <button
                             type="button"
                             onClick={() => setExpandedId(isExpanded ? null : booking.id)}
@@ -1153,52 +1174,6 @@ export default function AdminPrenotazioniPage() {
                       Box: {getBoxTypeLabel(booking.box_type)}
                     </p>
 
-                    {booking.status === "pending" ? (
-                      <div className="mt-4 grid gap-3">
-                        <div>
-                          <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Nuovo arrivo
-                          </label>
-
-                          <input
-                            type="date"
-                            value={dateEdit.startDate}
-                            onChange={(event) =>
-                              setBookingDateEdits((current) => ({
-                                ...current,
-                                [booking.id]: {
-                                  ...dateEdit,
-                                  startDate: event.target.value,
-                                },
-                              }))
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Nuova uscita
-                          </label>
-
-                          <input
-                            type="date"
-                            value={dateEdit.endDate}
-                            min={dateEdit.startDate}
-                            onChange={(event) =>
-                              setBookingDateEdits((current) => ({
-                                ...current,
-                                [booking.id]: {
-                                  ...dateEdit,
-                                  endDate: event.target.value,
-                                },
-                              }))
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                          />
-                        </div>
-                      </div>
-                    ) : null}
                   </div>
 
                   <div className="rounded-2xl bg-slate-50 p-4">
@@ -1402,6 +1377,34 @@ export default function AdminPrenotazioniPage() {
           Questa azione non puo essere annullata.
         </p>
       </ResponsiveDialog>
+
+      {bookingBeingEdited ? (
+        <BookingScheduleEditor
+          key={bookingBeingEdited.id}
+          booking={{
+            id: bookingBeingEdited.id,
+            status: bookingBeingEdited.status,
+            startDate: bookingBeingEdited.start_date,
+            endDate: bookingBeingEdited.end_date,
+            expectedArrivalTime: bookingBeingEdited.expected_arrival_time,
+            expectedPickupTime: bookingBeingEdited.expected_pickup_time,
+            dogNames: getBookingDogNames(bookingBeingEdited),
+            dogSizes: getBookingDogs(bookingBeingEdited).map((dog) => dog.size),
+            extraServiceIds:
+              bookingBeingEdited.selected_extra_services?.map(
+                (service) => service.id,
+              ) ?? [],
+          }}
+          onClose={() => setBookingBeingEdited(null)}
+          onSaved={async () => {
+            await reloadBookings({ clearMessages: false });
+            setBookingBeingEdited(null);
+            setSuccessMessage(
+              "Date, orari e preventivo aggiornati correttamente.",
+            );
+          }}
+        />
+      ) : null}
     </section>
   );
 }
