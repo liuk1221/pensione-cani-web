@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BookingScheduleEditor } from "@/components/admin/BookingScheduleEditor";
 import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import { getBoxTypeLabel } from "@/lib/box-types";
@@ -304,6 +304,10 @@ export default function AdminPrenotazioniPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [highlightedBookingId, setHighlightedBookingId] = useState<
+    string | null
+  >(null);
+  const hasScrolledToHighlightedBookingRef = useRef(false);
 
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "all">(
     "pending",
@@ -329,14 +333,108 @@ export default function AdminPrenotazioniPage() {
     useState<Booking | null>(null);
   const [bookingBeingEdited, setBookingBeingEdited] =
     useState<Booking | null>(null);
+  const hiddenBookingIdsRef = useRef(new Set<string>());
 
   const todayKey = getTodayDateKey();
 
+  useEffect(() => {
+    const bookingId = new URLSearchParams(window.location.search).get(
+      "booking",
+    );
+
+    if (!bookingId) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      setStatusFilter("all");
+      setSourceFilter("all");
+      setSearchQuery("");
+      setFromDateFilter("");
+      setToDateFilter("");
+      setActiveTodayOnly(false);
+      setHighlightedBookingId(bookingId);
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !highlightedBookingId ||
+      isLoading ||
+      hasScrolledToHighlightedBookingRef.current
+    ) {
+      return;
+    }
+
+    const bookingCard = document.getElementById(
+      `booking-card-${highlightedBookingId}`,
+    );
+
+    if (!bookingCard) {
+      return;
+    }
+
+    hasScrolledToHighlightedBookingRef.current = true;
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const animationFrame = window.requestAnimationFrame(() => {
+      bookingCard.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
+    });
+    const highlightTimeout = window.setTimeout(() => {
+      setHighlightedBookingId(null);
+    }, 2500);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(highlightTimeout);
+    };
+  }, [bookings, highlightedBookingId, isLoading]);
+
+  useEffect(() => {
+    if (!expandedId) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      const details = document.getElementById(
+        `booking-details-${expandedId}`,
+      );
+
+      if (!details) {
+        return;
+      }
+
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      details.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [expandedId]);
+
   function applyBookings(nextBookings: Booking[]) {
-    setBookings(nextBookings);
+    const visibleBookings = nextBookings.filter(
+      (booking) => !hiddenBookingIdsRef.current.has(booking.id),
+    );
+
+    setBookings(visibleBookings);
     setAdminNotesById(
       Object.fromEntries(
-        nextBookings.map((booking) => [booking.id, booking.admin_notes ?? ""]),
+        visibleBookings.map((booking) => [
+          booking.id,
+          booking.admin_notes ?? "",
+        ]),
       ),
     );
   }
@@ -516,11 +614,28 @@ export default function AdminPrenotazioniPage() {
   }
 
   async function deleteBooking(booking: Booking) {
+    const originalIndex = bookings.findIndex((item) => item.id === booking.id);
+    const previousAdminNote =
+      adminNotesById[booking.id] ?? booking.admin_notes ?? "";
+
     try {
       setBookingPendingDeletion(null);
       setUpdatingId(booking.id);
       setError(null);
       setSuccessMessage(null);
+      hiddenBookingIdsRef.current.add(booking.id);
+
+      setBookings((current) =>
+        current.filter((item) => item.id !== booking.id),
+      );
+      setAdminNotesById((current) => {
+        const next = { ...current };
+        delete next[booking.id];
+        return next;
+      });
+      setExpandedId((current) =>
+        current === booking.id ? null : current,
+      );
 
       const response = await fetch(`/api/admin/bookings/${booking.id}`, {
         method: "DELETE",
@@ -534,18 +649,24 @@ export default function AdminPrenotazioniPage() {
         );
       }
 
-      setBookings((current) =>
-        current.filter((item) => item.id !== booking.id),
-      );
+      setSuccessMessage("Prenotazione eliminata definitivamente.");
+    } catch (error) {
+      hiddenBookingIdsRef.current.delete(booking.id);
+      setBookings((current) => {
+        if (current.some((item) => item.id === booking.id)) {
+          return current;
+        }
 
-      setAdminNotesById((current) => {
-        const next = { ...current };
-        delete next[booking.id];
+        const next = [...current];
+        const restoreIndex =
+          originalIndex < 0 ? next.length : Math.min(originalIndex, next.length);
+        next.splice(restoreIndex, 0, booking);
         return next;
       });
-
-      setSuccessMessage("Prenotazione eliminata definitivamente dal DB.");
-    } catch (error) {
+      setAdminNotesById((current) => ({
+        ...current,
+        [booking.id]: previousAdminNote,
+      }));
       setError(
         error instanceof Error
           ? error.message
@@ -1025,12 +1146,29 @@ export default function AdminPrenotazioniPage() {
             const isUpdating = updatingId === booking.id;
             const bookingDogs = getBookingDogs(booking);
             const bookingDogNames = getBookingDogNames(booking);
+            const detailsId = `booking-details-${booking.id}`;
+            const isHighlighted = highlightedBookingId === booking.id;
 
             return (
               <article
                 key={booking.id}
-                className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"
+                id={`booking-card-${booking.id}`}
+                className={`scroll-mt-28 rounded-3xl border bg-white p-8 transition duration-500 ${
+                  isHighlighted
+                    ? "border-yellow-400 shadow-xl ring-4 ring-yellow-200"
+                    : "border-slate-200 shadow-sm"
+                }`}
               >
+                {isHighlighted && (
+                  <div className="mb-5 flex items-center gap-2 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-bold text-yellow-950">
+                    <span
+                      aria-hidden="true"
+                      className="h-2.5 w-2.5 animate-pulse rounded-full bg-yellow-500"
+                    />
+                    Prenotazione selezionata dalla vista Presenze
+                  </div>
+                )}
+
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-bold text-slate-950">
@@ -1058,94 +1196,132 @@ export default function AdminPrenotazioniPage() {
                     Richiesta ricevuta il {formatDateTime(booking.created_at)}
                   </p>
 
+                  <div className="mt-6 grid gap-5 border-t border-slate-100 pt-5 xl:grid-cols-[1.1fr_1fr_auto]">
                     <div>
-                        <div className="mt-6 flex flex-wrap items-center gap-3">
-                            <button
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Gestione
+                      </p>
+                      <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => {
+                            setError(null);
+                            setSuccessMessage(null);
+                            setBookingBeingEdited(booking);
+                          }}
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        >
+                          Modifica date e orari
+                        </button>
+
+                        {booking.status === "pending" ? (
+                          <button
                             type="button"
                             disabled={isUpdating}
-                            onClick={() => {
-                              setError(null);
-                              setSuccessMessage(null);
-                              setBookingBeingEdited(booking);
-                            }}
-                            className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                            Modifica date e orari
-                            </button>
-
-                            <a
-                            href={getGoogleCalendarUrl(booking)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 transition hover:border-[#34A853] hover:bg-[#E6F4EA] hover:text-[#137333]"
-                            >
-                            Salva in Google Calendar
-                            </a>
-
-                            <button
-                            type="button"
-                            onClick={() => setExpandedId(isExpanded ? null : booking.id)}
-                            className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                            {isExpanded ? "Chiudi dettagli" : "Dettagli"}
-                            </button>
-
-                            {booking.status === "pending" ? (
-                            <>
-                                <button
-                                type="button"
-                                disabled={isUpdating}
-                                onClick={() => openStatusActionDialog(booking, "confirmed")}
-                                className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-green-200 bg-green-50 px-5 py-2 text-sm font-bold text-green-800 transition hover:border-green-300 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                Conferma
-                                </button>
-
-                                <button
-                                type="button"
-                                disabled={isUpdating}
-                                onClick={() => openStatusActionDialog(booking, "rejected")}
-                                className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-red-200 bg-red-50 px-5 py-2 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                Rifiuta
-                                </button>
-                            </>
-                            ) : booking.status === "confirmed" ? (
-                            <>
-                                <button
-                                type="button"
-                                disabled={isUpdating}
-                                onClick={() => openStatusActionDialog(booking, "completed")}
-                                className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                Completa
-                                </button>
-
-                                <button
-                                type="button"
-                                disabled={isUpdating}
-                                onClick={() => void updateBookingStatus(booking.id, "cancelled")}
-                                className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                Annulla
-                                </button>
-                            </>
-                            ) : (
-                            <span className="inline-flex min-h-[42px] items-center justify-center rounded-full bg-slate-100 px-5 py-2 text-sm font-bold text-slate-500">
-                                Nessuna azione disponibile
-                            </span>
-                            )}
-
-                            <button
+                            onClick={() =>
+                              openStatusActionDialog(booking, "confirmed")
+                            }
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-green-200 bg-green-50 px-5 py-2 text-sm font-bold text-green-800 transition hover:border-green-300 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                          >
+                            Conferma
+                          </button>
+                        ) : booking.status === "confirmed" ? (
+                          <button
                             type="button"
                             disabled={isUpdating}
-                            onClick={() => setBookingPendingDeletion(booking)}
-                            className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-red-200 bg-red-50 px-5 py-2 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                            Elimina dal DB
-                            </button>
-                        </div>
+                            onClick={() =>
+                              openStatusActionDialog(booking, "completed")
+                            }
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-bold text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                          >
+                            Completa
+                          </button>
+                        ) : (
+                          <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-slate-100 px-5 py-2 text-sm font-bold text-slate-500 sm:w-auto">
+                            Nessuna azione disponibile
+                          </span>
+                        )}
+                      </div>
                     </div>
+
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Strumenti
+                      </p>
+                      <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
+                        <button
+                          type="button"
+                          aria-controls={detailsId}
+                          aria-expanded={isExpanded}
+                          onClick={() =>
+                            setExpandedId(isExpanded ? null : booking.id)
+                          }
+                          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                        >
+                          {isExpanded
+                            ? "Nascondi dettagli"
+                            : "Mostra dettagli"}
+                          <span
+                            aria-hidden="true"
+                            className="text-base leading-none"
+                          >
+                            {isExpanded ? "▴" : "▾"}
+                          </span>
+                        </button>
+
+                        <a
+                          href={getGoogleCalendarUrl(booking)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-bold text-slate-700 transition hover:border-[#34A853] hover:bg-[#E6F4EA] hover:text-[#137333] sm:w-auto"
+                        >
+                          Google Calendar
+                          <span aria-hidden="true">↗</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-red-600">
+                        Cancellazioni
+                      </p>
+                      <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
+                        {booking.status === "pending" ? (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() =>
+                              openStatusActionDialog(booking, "rejected")
+                            }
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-red-200 bg-white px-5 py-2 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                          >
+                            Rifiuta
+                          </button>
+                        ) : booking.status === "confirmed" ? (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() =>
+                              void updateBookingStatus(booking.id, "cancelled")
+                            }
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-amber-200 bg-amber-50 px-5 py-2 text-sm font-bold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                          >
+                            Annulla
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => setBookingPendingDeletion(booking)}
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-red-200 bg-red-50 px-5 py-2 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        >
+                          Elimina definitivamente
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-6 grid gap-6 md:grid-cols-3">
@@ -1219,7 +1395,10 @@ export default function AdminPrenotazioniPage() {
                 </div>
 
                 {isExpanded && (
-                  <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div
+                    id={detailsId}
+                    className="mt-6 grid scroll-mt-28 gap-6 lg:grid-cols-2"
+                  >
                     {(booking.estimated_price_cents !== null ||
                       (booking.selected_extra_services?.length ?? 0) > 0) && (
                       <div className="rounded-2xl bg-green-50 p-4 text-sm text-green-950">

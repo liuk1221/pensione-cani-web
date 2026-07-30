@@ -16,6 +16,10 @@ const adminNavItems = [
     href: "/admin/calendario",
   },
   {
+    label: "Presenze",
+    href: "/admin/presenze",
+  },
+  {
     label: "Disponibilità",
     href: "/admin/disponibilita",
   },
@@ -80,7 +84,11 @@ export function Navbar() {
           </div>
         </Link>
 
-        <div className="hidden items-center gap-8 md:flex">
+        <div
+          className={`hidden items-center ${
+            isAdminArea ? "gap-5 lg:flex xl:gap-8" : "gap-8 md:flex"
+          }`}
+        >
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -116,7 +124,9 @@ export function Navbar() {
 
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 md:hidden"
+          className={`items-center justify-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 ${
+            isAdminArea ? "inline-flex lg:hidden" : "inline-flex md:hidden"
+          }`}
           onClick={() => setIsOpen((value) => !value)}
           aria-label={isOpen ? "Chiudi menu" : "Apri menu"}
         >
@@ -125,7 +135,11 @@ export function Navbar() {
       </nav>
 
       {isOpen && (
-        <div className="border-t border-slate-200 bg-white px-4 py-4 md:hidden">
+        <div
+          className={`border-t border-slate-200 bg-white px-4 py-4 ${
+            isAdminArea ? "lg:hidden" : "md:hidden"
+          }`}
+        >
           <div className="flex flex-col gap-4">
             {navItems.map((item) => (
               <Link
