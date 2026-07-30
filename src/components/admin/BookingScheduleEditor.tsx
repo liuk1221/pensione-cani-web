@@ -384,8 +384,8 @@ export function BookingScheduleEditor({
       onClose={onClose}
       onConfirm={proceedToConfirmation}
     >
-      <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-        <div>
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+        <div className="min-w-0">
           {isLoadingAvailability ? (
             <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 font-medium text-blue-950">
               Caricamento disponibilita in corso...

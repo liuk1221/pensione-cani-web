@@ -61,7 +61,7 @@ export function ResponsiveDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex min-h-dvh items-end justify-center overflow-y-auto bg-slate-950/55 px-4 py-4 backdrop-blur-sm sm:items-center sm:py-8"
+      className="fixed inset-0 z-50 flex min-h-dvh items-end justify-center overflow-hidden bg-slate-950/55 p-2 backdrop-blur-sm sm:items-center sm:p-8"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isConfirming) {
@@ -72,14 +72,14 @@ export function ResponsiveDialog({
       <div
         aria-labelledby="responsive-dialog-title"
         aria-modal="true"
-        className={`w-full rounded-3xl bg-white p-6 shadow-2xl sm:p-8 ${
+        className={`max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-3xl bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-4rem)] sm:p-8 ${
           size === "wide" ? "max-w-6xl" : "max-w-lg"
         }`}
         role="dialog"
       >
         <h2
           id="responsive-dialog-title"
-          className="text-xl font-bold text-slate-950 sm:text-2xl"
+          className="break-words text-xl font-bold text-slate-950 sm:text-2xl"
         >
           {title}
         </h2>

@@ -21,6 +21,7 @@ type AvailabilityCalendarProps = {
   isDayDisabled?: (date: string, availability?: DayAvailability) => boolean;
   disablePastDates?: boolean;
   allowedPastDateKeys?: string[];
+  compact?: boolean;
 };
 
 const monthNames = [
@@ -126,6 +127,7 @@ export function AvailabilityCalendar({
   isDayDisabled,
   disablePastDates = mode !== "admin",
   allowedPastDateKeys = [],
+  compact = false,
 }: AvailabilityCalendarProps) {
   const today = new Date();
   const todayKey = toDateKey(today);
@@ -180,21 +182,26 @@ export function AvailabilityCalendar({
   }
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur sm:p-6">
-      <div className="mb-6 flex items-center justify-between gap-4">
+    <div
+      className={`min-w-0 rounded-3xl border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur ${
+        compact ? "sm:p-4" : "sm:p-6"
+      }`}
+    >
+      <div className="mb-4 flex min-w-0 items-center justify-between gap-2 sm:mb-6 sm:gap-4">
         <button
           type="button"
           onClick={goToPreviousMonth}
-          className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          aria-label="Mese precedente"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
           ←
         </button>
 
-        <div className="text-center">
-          <h2 className="text-xl font-bold text-slate-950">
+        <div className="min-w-0 text-center">
+          <h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl">
             {monthNames[month]} {year}
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="truncate text-xs text-slate-500 sm:text-sm">
             {mode === "admin"
               ? "Vista amministratore"
               : "Disponibilità indicativa"}
@@ -204,13 +211,18 @@ export function AvailabilityCalendar({
         <button
           type="button"
           onClick={goToNextMonth}
-          className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          aria-label="Mese successivo"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
           →
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center sm:gap-2">
+      <div
+        className={`grid grid-cols-7 gap-1 text-center ${
+          compact ? "" : "sm:gap-2"
+        }`}
+      >
         {weekDays.map((day) => (
           <div
             key={day}
@@ -259,38 +271,64 @@ export function AvailabilityCalendar({
                   : ""
               }`}
               onClick={() => onDayClick?.(dateKey)}
-              className={`min-h-[4.25rem] rounded-xl border px-1 py-1.5 text-center transition sm:min-h-24 sm:rounded-2xl sm:p-2 sm:text-left ${getDayClasses(
+              className={`min-w-0 border text-center transition ${
+                compact
+                  ? "min-h-14 rounded-lg px-1 py-1.5 sm:min-h-[4.5rem] sm:rounded-xl sm:p-2"
+                  : "min-h-14 rounded-lg px-0.5 py-1.5 sm:min-h-24 sm:rounded-2xl sm:p-2 sm:text-left"
+              } ${getDayClasses(
               status,
               selectionState,
               disabled,
               )} ${isClickable ? "cursor-pointer" : "cursor-not-allowed"}`}
             >
-              <div className="flex items-start justify-center gap-1 sm:justify-between">
+              <div
+                className={`flex items-start justify-center gap-1 ${
+                  compact ? "" : "sm:justify-between"
+                }`}
+              >
                 <span className="text-sm font-bold leading-none sm:text-sm sm:leading-normal">
                   {date.getDate()}
                 </span>
 
-                <span className="availability-day-status rounded-full bg-white/70 px-2 py-1 text-[10px] font-bold">
-                  {getStatusLabel(status)}
-                </span>
+                {!compact && (
+                  <span className="availability-day-status rounded-full bg-white/70 px-2 py-1 text-[10px] font-bold">
+                    {getStatusLabel(status)}
+                  </span>
+                )}
               </div>
 
               {availability && status !== "closed" && status !== "past" && (
-                <div className="mt-2 leading-none sm:mt-3 sm:text-xs sm:leading-normal">
-                  <p className="font-semibold">
-                    <span className="availability-mobile-count">
+                <div
+                  className={
+                    compact
+                      ? "mt-1 text-center text-[10px] font-bold leading-tight sm:text-xs"
+                      : "mt-2 leading-none sm:mt-3 sm:text-xs sm:leading-normal"
+                  }
+                >
+                  {compact ? (
+                    <p>
                       {availability.availableBoxes}/{availability.totalBoxes}
-                    </span>
-                    <span className="availability-desktop-count">
-                      {availability.availableBoxes} / {availability.totalBoxes}{" "}
-                      liberi
-                    </span>
-                  </p>
-
-                  {mode === "admin" && (
-                    <p className="mt-1 hidden opacity-80 sm:block">
-                      {availability.occupiedBoxes} occupati
+                      <span className="hidden 2xl:inline"> liberi</span>
                     </p>
+                  ) : (
+                    <>
+                      <p className="font-semibold">
+                        <span className="availability-mobile-count">
+                          {availability.availableBoxes}/
+                          {availability.totalBoxes}
+                        </span>
+                        <span className="availability-desktop-count">
+                          {availability.availableBoxes} /{" "}
+                          {availability.totalBoxes} liberi
+                        </span>
+                      </p>
+
+                      {mode === "admin" && (
+                        <p className="mt-1 hidden opacity-80 sm:block">
+                          {availability.occupiedBoxes} occupati
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -299,7 +337,7 @@ export function AvailabilityCalendar({
         })}
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-3 text-sm">
+      <div className="mt-4 flex flex-wrap gap-x-3 gap-y-2 text-xs sm:mt-6 sm:text-sm">
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full bg-green-400" />
           <span className="mt-1 text-slate-500">Disponibile</span>
