@@ -10,11 +10,11 @@ export type EstimateDog = {
 };
 
 export type BookingEstimate = {
-  stayType: "day_care" | "overnight";
+  stayType: "overnight";
   quantity: number;
   dogCount: number;
-  overnightUnitRateCents: number | null;
-  overnightRateLabel: string | null;
+  overnightUnitRateCents: number;
+  overnightRateLabel: string;
   baseSubtotalCents: number;
   baseBeforeDiscountsCents: number;
   secondDogDiscountCents: number;
@@ -40,15 +40,7 @@ export function formatEuro(cents: number) {
 }
 
 export function getStayQuantity(startDate: string, endDate: string) {
-  if (startDate === endDate) {
-    return 1;
-  }
-
-  return Math.max(1, getDateKeysInRange(startDate, endDate).length);
-}
-
-export function getStayType(startDate: string, endDate: string) {
-  return startDate === endDate ? "day_care" : "overnight";
+  return getDateKeysInRange(startDate, endDate).length;
 }
 
 function getOvernightRateTier(quantity: number) {
@@ -105,37 +97,28 @@ export function calculateBookingEstimate(params: {
   extraServiceIds: string[];
   expectedPickupTime?: string | null;
 }): BookingEstimate {
-  const stayType = getStayType(params.startDate, params.endDate);
   const quantity = getStayQuantity(params.startDate, params.endDate);
   const validDogs = params.dogs.slice(0, bookingPricing.maxDogsPerBooking);
   const dogCount = validDogs.length;
   const isPickupTimeComplete =
     typeof params.expectedPickupTime === "string" &&
     params.expectedPickupTime.trim().length > 0;
-  const isComplete = dogCount > 0 && isPickupTimeComplete;
-  const overnightRateTier =
-    stayType === "overnight" ? getOvernightRateTier(quantity) : null;
-  const overnightUnitRateCents = overnightRateTier?.amountCents ?? null;
+  const isComplete = quantity >= 1 && dogCount > 0 && isPickupTimeComplete;
+  const overnightRateTier = getOvernightRateTier(Math.max(1, quantity));
+  const overnightUnitRateCents = overnightRateTier.amountCents;
 
   const baseBeforeSharedBoxDiscount = validDogs.reduce((total, dog) => {
     if (!dog) {
       return total;
     }
 
-    const unitRate =
-      stayType === "day_care"
-        ? bookingPricing.dayCareRateCents
-        : (overnightUnitRateCents ?? bookingPricing.dayCareRateCents);
-
-    return total + unitRate * quantity;
+    return total + overnightUnitRateCents * quantity;
   }, 0);
 
   const secondDogDiscountCents =
     dogCount >= 2
       ? Math.round(
-          ((stayType === "day_care"
-            ? bookingPricing.dayCareRateCents
-            : (overnightUnitRateCents ?? 0)) *
+          (overnightUnitRateCents *
             quantity *
             bookingPricing.secondDogDiscountPercent) /
             100,
@@ -177,11 +160,11 @@ export function calculateBookingEstimate(params: {
   );
 
   return {
-    stayType,
+    stayType: "overnight",
     quantity,
     dogCount,
     overnightUnitRateCents,
-    overnightRateLabel: overnightRateTier?.label ?? null,
+    overnightRateLabel: overnightRateTier.label,
     baseSubtotalCents,
     baseBeforeDiscountsCents: baseBeforeSharedBoxDiscount,
     secondDogDiscountCents,

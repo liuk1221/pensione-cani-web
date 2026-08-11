@@ -172,10 +172,6 @@ function parseDogSize(value: unknown): DogSize | null {
     : null;
 }
 
-function getStayType(startDate: string, endDate: string) {
-  return startDate === endDate ? "day_care" : "overnight";
-}
-
 function normalizeDogs(body: PublicBookingBody) {
   const rawDogs = Array.isArray(body.dogs)
     ? (body.dogs as DogPayload[])
@@ -326,9 +322,12 @@ export async function POST(request: NextRequest) {
   const startDate = body.startDate;
   const endDate = body.endDate;
 
-  if (endDate < startDate) {
+  if (endDate <= startDate) {
     return NextResponse.json(
-      { error: "La data di uscita non puo essere precedente all'arrivo." },
+      {
+        error:
+          "La data di uscita deve essere successiva all'arrivo: ogni prenotazione deve includere almeno una notte.",
+      },
       { status: 400 },
     );
   }
@@ -354,7 +353,7 @@ export async function POST(request: NextRequest) {
       Date.parse(`${startDate}T00:00:00Z`)) /
     86_400_000;
 
-  if (!Number.isFinite(stayDays) || stayDays > 370) {
+  if (!Number.isFinite(stayDays) || stayDays < 1 || stayDays > 370) {
     return NextResponse.json(
       { error: "Intervallo di prenotazione non valido o troppo ampio." },
       { status: 400 },
@@ -395,7 +394,7 @@ export async function POST(request: NextRequest) {
   const expectedPickupTime = normalizeOptionalTime(body.expectedPickupTime);
   const requestedBoxType = normalizeOptionalBoxType(body.boxType);
   const notes = normalizeOptionalString(body.notes);
-  const stayType = getStayType(startDate, endDate);
+  const stayType = "overnight" as const;
 
   if (
     typeof body.boxType === "string" &&

@@ -2,9 +2,9 @@ import Link from "next/link";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata = createPageMetadata({
-  title: "Servizi di pensione e asilo per cani",
+  title: "Servizi di pensione per cani",
   description:
-    "Servizi per cani a Fabriano: pensione notturna, asilo giornaliero, aree esterne, sgambamento e gestione personalizzata del soggiorno.",
+    "Servizi per cani a Fabriano: soggiorni con pernottamento, aree esterne, sgambamento e gestione personalizzata della permanenza.",
   path: "/servizi",
 });
 
@@ -15,9 +15,9 @@ const mainServices = [
       "Soggiorni con box dedicato, routine quotidiana, uscite controllate e attenzione al benessere del cane durante tutta la permanenza.",
   },
   {
-    title: "Asilo giornaliero",
+    title: "Soggiorni brevi e lunghi",
     description:
-      "Una soluzione pratica per chi ha bisogno di lasciare il cane in un ambiente sicuro per alcune ore o per l'intera giornata.",
+      "Permanenze da una notte in su, con tariffe progressive per i soggiorni continuativi più lunghi.",
   },
   {
     title: "Aree esterne e sgambamento",
@@ -60,9 +60,9 @@ const processSteps = [
 
 const serviceFaqs = [
   {
-    question: "Che differenza c'è tra asilo giornaliero e pensione notturna?",
+    question: "È possibile prenotare solo per il giorno?",
     answer:
-      "L'asilo giornaliero è pensato per permanenze diurne senza pernottamento. La pensione notturna include il soggiorno con box dedicato, gestione quotidiana e uscita concordata.",
+      "No. Tutte le prenotazioni comprendono almeno una notte, con arrivo e uscita in date diverse. Tuttavia si può concordare un ritiro anticipato con la struttura.",
   },
   {
     question: "Accogliete cani alla prima esperienza in pensione?",
@@ -90,9 +90,9 @@ export default function ServiziPage() {
           </h1>
 
           <p className="mt-5 max-w-3xl text-base leading-7 text-slate-600">
-            Che si tratti di poche ore, di una giornata intera o di un soggiorno
-            con pernottamento, l&apos;obiettivo e offrire un ambiente ordinato,
-            sicuro e attento alle abitudini di ogni ospite.
+            Per i soggiorni, l&apos;obiettivo e offrire un
+            ambiente ordinato, sicuro e attento alle abitudini di ogni ospite,
+            dall&apos;arrivo fino al ritiro concordato.
           </p>
         </div>
 

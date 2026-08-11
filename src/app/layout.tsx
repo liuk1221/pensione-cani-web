@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     "pensione cani Fabriano",
     "pensione per cani Ancona",
     "pensione cani Marche",
-    "asilo giornaliero cani",
+    "soggiorno cani con pernottamento",
     "box per cani",
     "Pirella Pet Resort",
   ],

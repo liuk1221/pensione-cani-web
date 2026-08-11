@@ -28,7 +28,6 @@ export type ExtraServiceId =
 export type BookingPricingConfig = {
   maxDogsPerBooking: number;
   secondDogDiscountPercent: number;
-  dayCareRateCents: number;
   overnightRateTiers: Array<{
     minNights: number;
     label: string;
@@ -37,40 +36,12 @@ export type BookingPricingConfig = {
 };
 
 export type ListinoConfig = {
-  dailyRates: ListinoPriceRow[];
   overnightRates: ListinoPriceRow[];
   extraServices: ListinoPriceRow[];
   promotions: ListinoPromotion[];
   conditions: string[];
   bookingPricing: BookingPricingConfig;
 };
-
-export const dailyRates: ListinoPriceRow[] = [
-  {
-    id: "day_care",
-    service: "Pensione giornaliera",
-    details: "Ingresso mattina, uscita entro sera, area sgambamento inclusa",
-    price: "EUR 15",
-    amountCents: 1500,
-    billingUnit: "per_day",
-  },
-  {
-    id: "half_day",
-    service: "Mezza giornata",
-    details: "Fino a 5 ore di permanenza, ideale per inserimenti graduali",
-    price: "EUR 10",
-    amountCents: 1000,
-    billingUnit: "per_day",
-  },
-  // {
-  //   id: "day_care_with_meal",
-  //   service: "Giornata con pasto",
-  //   details: "Asilo giornaliero con somministrazione pappa fornita dal cliente",
-  //   price: "EUR 25",
-  //   amountCents: 2500,
-  //   billingUnit: "per_day",
-  // },
-];
 
 export const overnightRates: ListinoPriceRow[] = [
   {
@@ -136,7 +107,7 @@ export const extraServices: ListinoPriceRow[] = [
   {
     id: "late_pickup",
     service: "Late pickup",
-    details: "Ritiro dopo le 11:00.",
+    details: "Supplemento per il ritiro dopo le 11:00.",
     price: "EUR 10",
     amountCents: 1000,
     billingUnit: "per_booking",
@@ -166,7 +137,7 @@ export const conditions: string[] = [
   "La struttura dispone di 3 box esterni in area dedicata con giardino privato e di ulteriori box interni situati in una zona separata e coperta. La scelta del box viene assegnata in base all’ordine di arrivo delle prenotazioni. In assenza di preferenze espresse dal proprietario, la struttura assegnerà prioritariamente i box esterni e, successivamente, quelli interni.",
   "Le tariffe sono indicative e possono variare in base a periodo, durata del soggiorno e necessita specifiche del cane.",
   "Ogni prenotazione occupa un solo box. Piu cani possono stare nella stessa prenotazione solo se compatibili tra loro e appartenenti allo stesso nucleo familiare.",
-  "Per soggiorni notturni il giorno di uscita non viene conteggiato come notte, salvo permanenza prolungata oltre l'orario concordato.",
+  "Ogni prenotazione deve includere almeno una notte. Il giorno di uscita non viene conteggiato come notte; per il ritiro dopo le 11:00 si applica il supplemento late pickup di EUR 10.",
   "Il cibo portato dal proprietario deve essere porzionato o accompagnato da indicazioni chiare sulle quantita giornaliere.",
   "Integratori e terapie vengono somministrati solo con istruzioni scritte e confezioni riconoscibili.",
   "Nei periodi di alta richiesta puo essere richiesta una caparra per confermare il posto.",
@@ -176,7 +147,6 @@ export const conditions: string[] = [
 export const bookingPricing: BookingPricingConfig = {
   maxDogsPerBooking: 2,
   secondDogDiscountPercent: 50,
-  dayCareRateCents: 1500,
   overnightRateTiers: [
     { minNights: 1, label: "1-3 notti", amountCents: 2000 },
     { minNights: 4, label: "4-6 notti", amountCents: 1800 },
@@ -186,7 +156,6 @@ export const bookingPricing: BookingPricingConfig = {
 };
 
 export const listinoConfig: ListinoConfig = {
-  dailyRates,
   overnightRates,
   extraServices,
   promotions,

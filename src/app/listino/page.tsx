@@ -9,7 +9,7 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata = createPageMetadata({
   title: "Listino prezzi pensione cani",
   description:
-    "Prezzi indicativi per pensione cani a Fabriano: asilo giornaliero, pensione notturna, soggiorni lunghi, box condiviso famiglia e servizi extra.",
+    "Prezzi indicativi per soggiorni con pernottamento a Fabriano: tariffe per notte, soggiorni lunghi, box condiviso famiglia e servizi extra.",
   path: "/listino",
 });
 
@@ -83,15 +83,9 @@ function PriceTable({
 export default function ListinoPage() {
   const priceSections: PriceSection[] = [
     {
-      title: "Tariffe giornaliere",
+      title: "Pensione con pernottamento",
       description:
-        "Soluzioni per chi ha bisogno di lasciare il cane durante il giorno, senza pernottamento.",
-      rows: listinoConfig.dailyRates,
-    },
-    {
-      title: "Pensione notturna",
-      description:
-        "Tariffe per soggiorni con pernottamento, box dedicato e gestione quotidiana.",
+        "Tariffe per soggiorni da una notte in su, con box dedicato e gestione quotidiana.",
       rows: listinoConfig.overnightRates,
     },
     {
@@ -109,14 +103,14 @@ export default function ListinoPage() {
         "Le tariffe partono da EUR 20 a notte per soggiorni brevi e scendono per permanenze continuative piu lunghe, secondo il listino indicato in pagina.",
     },
     {
-      question: "Quanto costa lasciare il cane durante il giorno?",
+      question: "È possibile prenotare senza pernottamento?",
       answer:
-        "La pensione giornaliera parte da EUR 15, mentre la mezza giornata parte da EUR 10, salvo servizi extra o esigenze specifiche.",
+        "No. La prenotazione minima è di una notte: arrivo e uscita devono essere in date diverse. Tuttavia è possibile concordare l'uscita anticipata con la struttura.",
     },
     {
-      question: "Il prezzo finale è sempre quello del listino?",
+      question: "Come funziona il late pickup?",
       answer:
-        "Il listino è indicativo. La conferma finale dipende da periodo, durata, disponibilita, necessita del cane e servizi richiesti.",
+        "Per il ritiro dopo le 11:00 viene aggiunto al preventivo il consueto supplemento di EUR 10 per prenotazione.",
     },
   ];
 
@@ -133,9 +127,8 @@ export default function ListinoPage() {
           </h1>
 
           <p className="mt-5 max-w-3xl text-base leading-7 text-slate-600">
-            Consulta le tariffe indicative per asilo giornaliero, pensione
-            notturna e servizi extra. La conferma finale viene sempre valutata
-            in base alle esigenze del cane e alla disponibilità della struttura.
+            Consulta le tariffe indicative per i soggiorni e per i servizi extra. La conferma finale viene sempre valutata in
+            base alle esigenze del cane e alla disponibilità della struttura.
           </p>
         </div>
 

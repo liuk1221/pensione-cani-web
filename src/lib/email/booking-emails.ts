@@ -87,7 +87,7 @@ function formatDate(dateKey: string) {
 
 function getDateSummary(startDate: string, endDate: string) {
   if (startDate === endDate) {
-    return `Giornata del ${formatDate(startDate)}`;
+    return `Soggiorno storico senza pernottamento del ${formatDate(startDate)}`;
   }
 
   return `Dal ${formatDate(startDate)} al ${formatDate(endDate)}`;
@@ -160,7 +160,7 @@ function getSterilizedLabel(value: boolean | null) {
 
 function getStayTypeLabel(stayType: string) {
   const labels: Record<string, string> = {
-    day_care: "Asilo giornaliero",
+    day_care: "Soggiorno senza pernottamento (storico)",
     overnight: "Pensione con pernottamento",
   };
 

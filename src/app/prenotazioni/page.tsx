@@ -11,7 +11,7 @@ export const revalidate = 0;
 export const metadata = createPageMetadata({
   title: "Prenotazione pensione cani online",
   description:
-    "Richiedi online la disponibilita per la pensione cani Pirella Pet Resort a Fabriano. Seleziona le date e invia le informazioni del cane.",
+    "Richiedi online un soggiorno con almeno una notte presso Pirella Pet Resort a Fabriano. Seleziona arrivo e uscita e invia le informazioni del cane.",
   path: "/prenotazioni",
 });
 

@@ -3,7 +3,7 @@ export const siteConfig = {
   legalName: "Pirella Pet Resort",
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.pirellapetresort.it",
   description:
-    "Pensione per cani a Fabriano, immersa nel verde, con box dedicati, aree esterne, asilo giornaliero, soggiorni notturni e prenotazioni online.",
+    "Pensione per cani a Fabriano, immersa nel verde, con box dedicati, aree esterne, soggiorni con pernottamento e prenotazioni online.",
   phone: "+39 338 450 1079",
   email: "info@lapirella.it",
   address: "Frazione Melano 140M, Fabriano (AN)",

@@ -6,15 +6,15 @@ import { createPageMetadata } from "@/lib/seo";
 export const metadata = createPageMetadata({
   title: "Pensione per cani a Fabriano",
   description:
-    "Pirella Pet Resort e una pensione per cani a Fabriano con box dedicati, aree esterne, asilo giornaliero, soggiorni notturni e prenotazioni online.",
+    "Pirella Pet Resort e una pensione per cani a Fabriano con box dedicati, aree esterne, soggiorni con pernottamento e prenotazioni online.",
   path: "",
 });
 
 const services = [
   {
-    title: "Pensione giornaliera e notturna",
+    title: "Pensione con pernottamento",
     description:
-      "Accoglienza sicura e controllata per soggiorni brevi o lunghi.",
+      "Accoglienza sicura e controllata per soggiorni da una notte in su.",
   },
   {
     title: "Box dedicati",
@@ -58,11 +58,6 @@ const homeFaqs = [
       "Pirella Pet Resort si trova in Frazione Melano 140M a Fabriano, in provincia di Ancona, all'interno del contesto verde del Circolo Ippico La Pirella.",
   },
   {
-    question: "La struttura offre pensione notturna per cani?",
-    answer:
-      "Si. La struttura accoglie cani per soggiorni con pernottamento, con box dedicato, routine quotidiana, aree esterne e molto altro!",
-  },
-  {
     question: "Posso richiedere disponibilita online?",
     answer:
       "Si. Dal modulo prenotazioni puoi scegliere il periodo, inserire le informazioni del cane e ricevere una prima email di riepilogo. La richiesta diventa effettiva dopo conferma della struttura.",
@@ -84,8 +79,8 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-6 max-w-xl text-lg leading-8 text-blue-100">
-              Richiedi una prenotazione online, controlla la disponibilità e
-              ricevi conferma direttamente via email.
+              Richiedi online un soggiorno con almeno una notte, controlla la
+              disponibilità e ricevi conferma direttamente via email.
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
