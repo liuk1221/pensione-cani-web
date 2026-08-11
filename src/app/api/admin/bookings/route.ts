@@ -249,10 +249,6 @@ function parseDogSize(value: unknown): DogSize | null {
     : null;
 }
 
-function getStayType(startDate: string, endDate: string) {
-  return startDate === endDate ? "day_care" : "overnight";
-}
-
 function normalizeDogs(body: ManualBookingBody) {
   const rawDogs = Array.isArray(body.dogs)
     ? (body.dogs as DogPayload[])
@@ -511,9 +507,12 @@ export async function POST(request: NextRequest) {
   const startDate = body.startDate;
   const endDate = body.endDate;
 
-  if (endDate < startDate) {
+  if (endDate <= startDate) {
     return NextResponse.json(
-      { error: "La data di uscita non puo essere precedente all'arrivo." },
+      {
+        error:
+          "La data di uscita deve essere successiva all'arrivo: ogni prenotazione deve includere almeno una notte.",
+      },
       { status: 400 },
     );
   }
@@ -553,7 +552,7 @@ export async function POST(request: NextRequest) {
   const ownerEmail = normalizeEmailForDb(body.email);
   const ownerPhone = normalizeRequiredDbString(body.phone);
   const notes = normalizeOptionalString(body.notes);
-  const stayType = getStayType(startDate, endDate);
+  const stayType = "overnight" as const;
 
   if (!expectedPickupTime) {
     return NextResponse.json(

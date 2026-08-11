@@ -118,6 +118,11 @@ export function BookingRequestForm({
       return;
     }
 
+    if (endDate <= startDate) {
+      setSubmitError("La prenotazione deve includere almeno una notte.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -475,8 +480,6 @@ function EstimatePanel({
 }: {
   estimate: ReturnType<typeof calculateBookingEstimate>;
 }) {
-  const stayUnit = estimate.stayType === "day_care" ? "giorno" : "notte";
-
   return (
     <div className="rounded-3xl border border-yellow-300 bg-yellow-50 p-6 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -487,7 +490,7 @@ function EstimatePanel({
           <p className="mt-2 text-sm leading-6 text-slate-700">
             Calcolo su {estimate.dogCount}{" "}
             {estimate.dogCount === 1 ? "cane" : "cani"} e {estimate.quantity}{" "}
-            {estimate.quantity === 1 ? stayUnit : `${stayUnit}/i`}.
+            {estimate.quantity === 1 ? "notte" : "notti"}.
           </p>
         </div>
 
@@ -508,12 +511,10 @@ function EstimatePanel({
             label="Pensione"
             value={formatEuro(estimate.baseBeforeDiscountsCents)}
           />
-          {estimate.overnightUnitRateCents !== null ? (
-            <EstimateRow
-              label={`Tariffa notturna ${estimate.overnightRateLabel}`}
-              value={`${formatEuro(estimate.overnightUnitRateCents)} / notte`}
-            />
-          ) : null}
+          <EstimateRow
+            label={`Tariffa notturna ${estimate.overnightRateLabel}`}
+            value={`${formatEuro(estimate.overnightUnitRateCents)} / notte`}
+          />
           <EstimateRow
             label="Servizi extra"
             value={formatEuro(estimate.extrasSubtotalCents)}

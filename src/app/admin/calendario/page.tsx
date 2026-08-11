@@ -163,7 +163,7 @@ export default function AdminCalendarioPage() {
   }
 
   function isValidEndDate(startDate: string, endDate: string) {
-    if (compareDateKeys(endDate, startDate) < 0) {
+    if (compareDateKeys(endDate, startDate) <= 0) {
       return false;
     }
 
@@ -175,10 +175,7 @@ export default function AdminCalendarioPage() {
       return true;
     }
 
-    const hasCompletedRange =
-      selectedStartDate &&
-      selectedEndDate &&
-      selectedStartDate !== selectedEndDate;
+    const hasCompletedRange = selectedStartDate && selectedEndDate;
 
     if (!selectedStartDate || hasCompletedRange) {
       return !hasAvailableDate(date);
@@ -199,10 +196,7 @@ export default function AdminCalendarioPage() {
     setSelectionError(null);
     setBookingSuccessMessage(null);
 
-    const hasCompletedRange =
-      selectedStartDate &&
-      selectedEndDate &&
-      selectedStartDate !== selectedEndDate;
+    const hasCompletedRange = selectedStartDate && selectedEndDate;
 
     if (!selectedStartDate || hasCompletedRange) {
       if (!hasAvailableDate(date)) {
@@ -213,7 +207,7 @@ export default function AdminCalendarioPage() {
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(date);
+      setSelectedEndDate(null);
       return;
     }
 
@@ -226,7 +220,14 @@ export default function AdminCalendarioPage() {
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(date);
+      setSelectedEndDate(null);
+      return;
+    }
+
+    if (date === selectedStartDate) {
+      setSelectionError(
+        "La data di uscita deve essere successiva all'arrivo: la prenotazione deve includere almeno una notte.",
+      );
       return;
     }
 
@@ -270,12 +271,14 @@ export default function AdminCalendarioPage() {
 
   const stayLabel =
     selectedStartDate && selectedEndDate
-      ? selectedStartDate === selectedEndDate
-        ? "Senza pernottamento"
-        : `${stayNights} ${stayNights === 1 ? "notte" : "notti"}`
+      ? `${stayNights} ${stayNights === 1 ? "notte" : "notti"}`
       : "-";
 
-  const canCreateBooking = Boolean(selectedStartDate && selectedEndDate);
+  const canCreateBooking = Boolean(
+    selectedStartDate &&
+      selectedEndDate &&
+      compareDateKeys(selectedEndDate, selectedStartDate) > 0,
+  );
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -388,9 +391,10 @@ export default function AdminCalendarioPage() {
             <div className="mt-6 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-950">
               <p className="font-bold">Regola calendario</p>
               <p className="mt-2">
-                Il primo tocco seleziona arrivo e uscita nello stesso giorno.
-                Con un secondo tocco puoi impostare l&apos;uscita e creare un
-                intervallo. Il giorno di uscita occupa il box.
+                Il primo tocco seleziona l&apos;arrivo; il secondo deve indicare
+                un&apos;uscita successiva. Ogni prenotazione comprende almeno una
+                notte. Il giorno di uscita occupa il box e il ritiro dopo le
+                11:00 applica il supplemento late pickup.
               </p>
             </div>
           </div>

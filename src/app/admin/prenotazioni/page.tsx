@@ -162,7 +162,7 @@ function normalizeText(value: string) {
 
 function getStayLabel(booking: Booking) {
   return booking.stay_type === "day_care"
-    ? "Senza pernottamento"
+    ? "Senza pernottamento (storico)"
     : "Con pernottamento";
 }
 

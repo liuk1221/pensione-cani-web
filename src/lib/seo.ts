@@ -84,7 +84,7 @@ export function localBusinessJsonLd() {
           absoluteUrl("/asset/Interiors_1.jpg"),
         ],
         logo: absoluteUrl("/images/logo-pirella-pet-resort-128.png"),
-        priceRange: "EUR 10-20",
+        priceRange: "EUR 15-20",
         address: {
           "@type": "PostalAddress",
           streetAddress: siteConfig.streetAddress,
@@ -101,13 +101,6 @@ export function localBusinessJsonLd() {
           {
             "@type": "Offer",
             name: "Pensione notturna per cani",
-            priceCurrency: "EUR",
-            availability: "https://schema.org/InStock",
-            url: absoluteUrl("/listino"),
-          },
-          {
-            "@type": "Offer",
-            name: "Asilo giornaliero per cani",
             priceCurrency: "EUR",
             availability: "https://schema.org/InStock",
             url: absoluteUrl("/listino"),

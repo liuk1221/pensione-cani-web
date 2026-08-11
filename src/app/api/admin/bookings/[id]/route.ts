@@ -129,10 +129,6 @@ function normalizeOptionalString(value: unknown) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function getStayType(startDate: string, endDate: string) {
-  return startDate === endDate ? "day_care" : "overnight";
-}
-
 function getSingleRelation<T>(relation: BookingRelation<T>) {
   return Array.isArray(relation) ? (relation[0] ?? null) : relation;
 }
@@ -379,19 +375,6 @@ export async function PATCH(
     );
   }
 
-  if (
-    isScheduleUpdate &&
-    nextStartDate === nextEndDate &&
-    nextArrivalTime &&
-    typeof nextPickupTime === "string" &&
-    nextPickupTime <= nextArrivalTime
-  ) {
-    return NextResponse.json(
-      { error: "L'orario di ritiro deve essere successivo all'orario di arrivo." },
-      { status: 400 },
-    );
-  }
-
   const todayKey = getTodayDateKey();
 
   if (
@@ -408,6 +391,20 @@ export async function PATCH(
   if (nextEndDate < nextStartDate) {
     return NextResponse.json(
       { error: "La data di uscita non puo essere precedente all'arrivo." },
+      { status: 400 },
+    );
+  }
+
+  const requiresOvernightStay =
+    isScheduleUpdate ||
+    (body.status === "confirmed" && booking.status !== "confirmed");
+
+  if (requiresOvernightStay && nextEndDate <= nextStartDate) {
+    return NextResponse.json(
+      {
+        error:
+          "La data di uscita deve essere successiva all'arrivo: ogni prenotazione deve includere almeno una notte.",
+      },
       { status: 400 },
     );
   }
@@ -455,12 +452,12 @@ export async function PATCH(
   if (body.status === "confirmed") {
     if (booking.status !== "confirmed") {
       updatePayload.confirmed_at = now;
+      updatePayload.start_date = nextStartDate;
+      updatePayload.end_date = nextEndDate;
+      updatePayload.stay_type = "overnight";
     }
     updatePayload.rejected_at = null;
     updatePayload.cancelled_at = null;
-    updatePayload.start_date = nextStartDate;
-    updatePayload.end_date = nextEndDate;
-    updatePayload.stay_type = getStayType(nextStartDate, nextEndDate);
     updatePayload.box_type = assignedBoxType;
   }
 
@@ -483,7 +480,7 @@ export async function PATCH(
 
     updatePayload.start_date = nextStartDate;
     updatePayload.end_date = nextEndDate;
-    updatePayload.stay_type = getStayType(nextStartDate, nextEndDate);
+    updatePayload.stay_type = "overnight";
     updatePayload.expected_arrival_time = nextArrivalTime;
     updatePayload.expected_pickup_time = nextPickupTime;
     updatePayload.estimated_price_cents = estimate.totalCents;

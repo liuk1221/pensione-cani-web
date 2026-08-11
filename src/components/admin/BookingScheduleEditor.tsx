@@ -196,7 +196,7 @@ export function BookingScheduleEditor({
 
   function isValidRange(rangeStart: string, rangeEnd: string) {
     return (
-      compareDateKeys(rangeEnd, rangeStart) >= 0 &&
+      compareDateKeys(rangeEnd, rangeStart) > 0 &&
       getFirstUnavailableDate(rangeStart, rangeEnd) === null
     );
   }
@@ -214,8 +214,7 @@ export function BookingScheduleEditor({
       return !isValidRange(booking.startDate, date);
     }
 
-    const hasCompletedRange =
-      startDate && endDate && startDate !== endDate;
+    const hasCompletedRange = startDate && endDate;
 
     if (!startDate || hasCompletedRange) {
       return !hasAvailableDate(date);
@@ -245,13 +244,20 @@ export function BookingScheduleEditor({
 
     if (!startDate || hasCompletedRange) {
       setStartDate(date);
-      setEndDate(date);
+      setEndDate(null);
       return;
     }
 
     if (compareDateKeys(date, startDate) < 0) {
       setStartDate(date);
-      setEndDate(date);
+      setEndDate(null);
+      return;
+    }
+
+    if (date === startDate) {
+      setError(
+        "La data di uscita deve essere successiva all'arrivo: la prenotazione deve includere almeno una notte.",
+      );
       return;
     }
 
@@ -260,6 +266,11 @@ export function BookingScheduleEditor({
 
   function proceedToConfirmation() {
     setError(null);
+
+    if (startDate && endDate && endDate <= startDate) {
+      setError("La prenotazione deve includere almeno una notte.");
+      return;
+    }
 
     if (!startDate || !endDate || !isValidRange(startDate, endDate)) {
       const unavailableDate =
@@ -276,17 +287,6 @@ export function BookingScheduleEditor({
 
     if (!expectedPickupTime) {
       setError("Inserisci l'orario previsto di ritiro.");
-      return;
-    }
-
-    if (
-      startDate === endDate &&
-      expectedArrivalTime &&
-      expectedPickupTime <= expectedArrivalTime
-    ) {
-      setError(
-        "L'orario di ritiro deve essere successivo all'orario di arrivo.",
-      );
       return;
     }
 
@@ -464,7 +464,7 @@ export function BookingScheduleEditor({
               Preventivo aggiornato
             </p>
             <p className="mt-2 text-3xl font-bold text-blue-950">
-              {expectedPickupTime ? formatEuro(estimate.totalCents) : "-"}
+              {estimate.isComplete ? formatEuro(estimate.totalCents) : "-"}
             </p>
             <p className="mt-2 text-xs leading-5 text-slate-600">
               Il totale viene ricalcolato automaticamente in base alle nuove

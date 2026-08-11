@@ -113,7 +113,7 @@ export function PrenotazioniClient({
   }
 
   function isValidEndDate(startDate: string, endDate: string) {
-    if (compareDateKeys(endDate, startDate) < 0) {
+    if (compareDateKeys(endDate, startDate) <= 0) {
       return false;
     }
 
@@ -125,10 +125,7 @@ export function PrenotazioniClient({
       return true;
     }
 
-    const hasCompletedRange =
-      selectedStartDate &&
-      selectedEndDate &&
-      selectedStartDate !== selectedEndDate;
+    const hasCompletedRange = selectedStartDate && selectedEndDate;
 
     if (!selectedStartDate || hasCompletedRange) {
       return !hasAvailableDate(date);
@@ -148,10 +145,7 @@ export function PrenotazioniClient({
   function handleDayClick(date: string) {
     setSelectionError(null);
 
-    const hasCompletedRange =
-      selectedStartDate &&
-      selectedEndDate &&
-      selectedStartDate !== selectedEndDate;
+    const hasCompletedRange = selectedStartDate && selectedEndDate;
 
     if (!selectedStartDate || hasCompletedRange) {
       if (!hasAvailableDate(date)) {
@@ -162,7 +156,7 @@ export function PrenotazioniClient({
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(date);
+      setSelectedEndDate(null);
       return;
     }
 
@@ -175,7 +169,14 @@ export function PrenotazioniClient({
       }
 
       setSelectedStartDate(date);
-      setSelectedEndDate(date);
+      setSelectedEndDate(null);
+      return;
+    }
+
+    if (date === selectedStartDate) {
+      setSelectionError(
+        "La data di uscita deve essere successiva all'arrivo: la prenotazione deve includere almeno una notte.",
+      );
       return;
     }
 
@@ -198,9 +199,13 @@ export function PrenotazioniClient({
   }
 
   function scrollToForm() {
-    if (!selectedStartDate || !selectedEndDate) {
+    if (
+      !selectedStartDate ||
+      !selectedEndDate ||
+      compareDateKeys(selectedEndDate, selectedStartDate) <= 0
+    ) {
       setSelectionError(
-        "Seleziona prima una data di arrivo e una data di uscita.",
+        "Seleziona un arrivo e un'uscita che includano almeno una notte.",
       );
       return;
     }
@@ -218,12 +223,14 @@ export function PrenotazioniClient({
 
   const stayLabel =
     selectedStartDate && selectedEndDate
-      ? selectedStartDate === selectedEndDate
-        ? "Senza pernottamento"
-        : `${stayNights} ${stayNights === 1 ? "notte" : "notti"}`
+      ? `${stayNights} ${stayNights === 1 ? "notte" : "notti"}`
       : "-";
 
-  const canContinue = Boolean(selectedStartDate && selectedEndDate);
+  const canContinue = Boolean(
+    selectedStartDate &&
+      selectedEndDate &&
+      compareDateKeys(selectedEndDate, selectedStartDate) > 0,
+  );
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
@@ -238,9 +245,9 @@ export function PrenotazioniClient({
           </h1>
 
           <p className="mt-4 text-slate-600">
-            Tocca un giorno per selezionarlo come arrivo e uscita. Con un
-            secondo tocco puoi impostare l&apos;uscita e creare un intervallo. In
-            caso di pernottamento, il giorno di uscita occupa il box.
+            Tocca un giorno per selezionare l&apos;arrivo, poi scegli un giorno
+            successivo per l&apos;uscita. Ogni prenotazione deve includere almeno
+            una notte e il giorno di uscita occupa il box.
           </p>
         </div>
 
@@ -334,9 +341,11 @@ export function PrenotazioniClient({
           <div className="mt-8 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-950">
             <p className="font-bold">Regola disponibilità</p>
             <p className="mt-2">
-              Il giorno di uscita viene considerato occupato per il box. La
-              prenotazione può avvenire attraverso tutti i canali disponibili
-              tra i contatti. Le richieste sono da ritenersi{" "}
+              Ogni soggiorno comprende almeno una notte. Il giorno di uscita
+              viene considerato occupato per il box; per il ritiro dopo le
+              11:00 si applica il supplemento late pickup. La prenotazione può
+              avvenire attraverso tutti i canali disponibili tra i contatti.
+              Le richieste sono da ritenersi{" "}
               <u>confermate solo una volta accettate dalla struttura</u>.
             </p>
           </div>
