@@ -593,8 +593,13 @@ function EstimatePanel({
             value={formatEuro(estimate.baseBeforeDiscountsCents)}
           />
           <EstimateRow
-            label={`Tariffa notturna ${estimate.overnightRateLabel}`}
-            value={`${formatEuro(estimate.overnightUnitRateCents)} / notte`}
+            label="Tariffa notturna progressiva"
+            value={estimate.overnightRateBreakdown
+              .map(
+                (rate) =>
+                  `${rate.quantity} x ${formatEuro(rate.unitRateCents)}`,
+              )
+              .join(" + ")}
           />
           <EstimateRow
             label="Servizi extra"

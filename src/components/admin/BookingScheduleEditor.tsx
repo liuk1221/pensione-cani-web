@@ -101,6 +101,8 @@ export function BookingScheduleEditor({
   const [availabilityByDate, setAvailabilityByDate] = useState<
     Record<string, DayAvailability>
   >({});
+  const [availabilityRefreshVersion, setAvailabilityRefreshVersion] =
+    useState(0);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +149,12 @@ export function BookingScheduleEditor({
     return () => {
       cancelled = true;
     };
-  }, [availabilityRange.from, availabilityRange.to, booking.id]);
+  }, [
+    availabilityRange.from,
+    availabilityRange.to,
+    availabilityRefreshVersion,
+    booking.id,
+  ]);
 
   const estimate = useMemo(
     () =>
@@ -386,6 +393,21 @@ export function BookingScheduleEditor({
     >
       <div className="grid min-w-0 gap-6 lg:grid-cols-[1.35fr_0.65fr]">
         <div className="min-w-0">
+          <div className="mb-4 flex justify-end">
+            <button
+              type="button"
+              disabled={isLoadingAvailability}
+              onClick={() =>
+                setAvailabilityRefreshVersion((current) => current + 1)
+              }
+              className="rounded-full border border-blue-200 bg-white px-4 py-2 text-xs font-bold text-blue-800 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoadingAvailability
+                ? "Aggiornamento..."
+                : "Aggiorna disponibilita"}
+            </button>
+          </div>
+
           {isLoadingAvailability ? (
             <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 font-medium text-blue-950">
               Caricamento disponibilita in corso...

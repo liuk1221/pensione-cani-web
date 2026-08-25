@@ -280,6 +280,7 @@ export async function assignBoxTypeForRange(params: {
   endDate: string;
   requiredBoxes: number;
   requestedBoxType?: BoxType | null;
+  preferredBoxType?: BoxType | null;
   excludeBookingId?: string;
 }): Promise<AssignmentResult> {
   try {
@@ -290,7 +291,14 @@ export async function assignBoxTypeForRange(params: {
     );
     const candidates = params.requestedBoxType
       ? [params.requestedBoxType]
-      : (["outdoor", "indoor"] as BoxType[]);
+      : params.preferredBoxType
+        ? [
+            params.preferredBoxType,
+            ...boxTypes.filter(
+              (boxType) => boxType !== params.preferredBoxType,
+            ),
+          ]
+        : (["outdoor", "indoor"] as BoxType[]);
 
     const selectedBoxType = candidates.find(
       (boxType) =>

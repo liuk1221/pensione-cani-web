@@ -242,10 +242,16 @@ export async function GET(
       startDate: from,
       endDate: to,
       excludeBookingId: id,
-      requestedBoxType: normalizeOptionalBoxType(booking.box_type),
     });
 
-    return NextResponse.json({ availabilityByDate });
+    return NextResponse.json(
+      { availabilityByDate },
+      {
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0",
+        },
+      },
+    );
   } catch (availabilityError) {
     console.error("Booking edit availability error:", availabilityError);
 
@@ -421,7 +427,14 @@ export async function PATCH(
       startDate: availabilityStartDate,
       endDate: nextEndDate,
       requiredBoxes: booking.box_count ?? 1,
-      requestedBoxType: normalizeOptionalBoxType(booking.box_type),
+      // Durante una modifica il box attuale resta la prima scelta, ma la
+      // prenotazione puo essere spostata nell'altra zona se e l'unica libera.
+      preferredBoxType: isScheduleUpdate
+        ? normalizeOptionalBoxType(booking.box_type)
+        : null,
+      requestedBoxType: isScheduleUpdate
+        ? null
+        : normalizeOptionalBoxType(booking.box_type),
       excludeBookingId: booking.id,
     });
 
