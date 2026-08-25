@@ -28,11 +28,9 @@ export type ExtraServiceId =
 export type BookingPricingConfig = {
   maxDogsPerBooking: number;
   secondDogDiscountPercent: number;
-  overnightRateTiers: Array<{
-    minNights: number;
-    label: string;
-    amountCents: number;
-  }>;
+  fullRateNights: number;
+  fullNightlyRateCents: number;
+  reducedNightlyRateCents: number;
 };
 
 export type ListinoConfig = {
@@ -45,33 +43,17 @@ export type ListinoConfig = {
 
 export const overnightRates: ListinoPriceRow[] = [
   {
-    id: "overnight_1_3",
-    service: "Pensione notturna 1-3 notti",
-    details: "Tariffa per soggiorni brevi consecutivi, box dedicato e gestione quotidiana",
+    id: "overnight_first_7",
+    service: "Prime 7 notti",
+    details: "Tariffa applicata a ciascuna delle prime sette notti del soggiorno",
     price: "EUR 20 / notte",
     amountCents: 2000,
     billingUnit: "per_night",
   },
   {
-    id: "overnight_4_6",
-    service: "Pensione notturna 4-6 notti",
-    details: "Tariffa ridotta per soggiorni consecutivi di media durata",
-    price: "EUR 18 / notte",
-    amountCents: 1800,
-    billingUnit: "per_night",
-  },
-  {
-    id: "overnight_7_13",
-    service: "Pensione notturna 7-13 notti",
-    details: "Tariffa ridotta per una settimana o piu di permanenza continuativa",
-    price: "EUR 16 / notte",
-    amountCents: 1600,
-    billingUnit: "per_night",
-  },
-  {
-    id: "overnight_14_plus",
-    service: "Pensione notturna 14+ notti",
-    details: "Tariffa piu conveniente per soggiorni lunghi consecutivi",
+    id: "overnight_after_7",
+    service: "Dall'ottava notte",
+    details: "Tariffa applicata a tutte le notti successive alle prime sette",
     price: "EUR 15 / notte",
     amountCents: 1500,
     billingUnit: "per_night",
@@ -129,7 +111,7 @@ export const promotions: ListinoPromotion[] = [
   {
     name: "Tariffa progressiva",
     condition: "Permanenze notturne continuative nello stesso soggiorno.",
-    benefit: "Prezzo per notte decrescente",
+    benefit: "EUR 15 dalla 8a notte",
   },
 ];
 
@@ -147,12 +129,9 @@ export const conditions: string[] = [
 export const bookingPricing: BookingPricingConfig = {
   maxDogsPerBooking: 2,
   secondDogDiscountPercent: 50,
-  overnightRateTiers: [
-    { minNights: 1, label: "1-3 notti", amountCents: 2000 },
-    { minNights: 4, label: "4-6 notti", amountCents: 1800 },
-    { minNights: 7, label: "7-13 notti", amountCents: 1600 },
-    { minNights: 14, label: "14+ notti", amountCents: 1500 },
-  ],
+  fullRateNights: 7,
+  fullNightlyRateCents: 2000,
+  reducedNightlyRateCents: 1500,
 };
 
 export const listinoConfig: ListinoConfig = {

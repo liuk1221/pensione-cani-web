@@ -100,7 +100,7 @@ export default function ListinoPage() {
     {
       question: "Quanto costa la pensione notturna per cani?",
       answer:
-        "Le tariffe partono da EUR 20 a notte per soggiorni brevi e scendono per permanenze continuative piu lunghe, secondo il listino indicato in pagina.",
+        "Le prime 7 notti costano EUR 20 ciascuna. Dall'ottava notte, tutte le notti successive costano EUR 15 ciascuna.",
     },
     {
       question: "È possibile prenotare senza pernottamento?",

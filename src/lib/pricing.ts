@@ -13,8 +13,15 @@ export type BookingEstimate = {
   stayType: "overnight";
   quantity: number;
   dogCount: number;
+  /** Tariffa delle prime notti, mantenuta anche nei dettagli salvati. */
   overnightUnitRateCents: number;
   overnightRateLabel: string;
+  overnightRateBreakdown: Array<{
+    label: string;
+    quantity: number;
+    unitRateCents: number;
+    subtotalCents: number;
+  }>;
   baseSubtotalCents: number;
   baseBeforeDiscountsCents: number;
   secondDogDiscountCents: number;
@@ -43,12 +50,32 @@ export function getStayQuantity(startDate: string, endDate: string) {
   return getDateKeysInRange(startDate, endDate).length;
 }
 
-function getOvernightRateTier(quantity: number) {
-  return bookingPricing.overnightRateTiers.reduce(
-    (selectedTier, tier) =>
-      quantity >= tier.minNights ? tier : selectedTier,
-    bookingPricing.overnightRateTiers[0],
+function getOvernightRateBreakdown(quantity: number) {
+  const fullRateQuantity = Math.min(
+    Math.max(0, quantity),
+    bookingPricing.fullRateNights,
   );
+  const reducedRateQuantity = Math.max(
+    0,
+    quantity - bookingPricing.fullRateNights,
+  );
+
+  return [
+    {
+      label: `Prime ${bookingPricing.fullRateNights} notti`,
+      quantity: fullRateQuantity,
+      unitRateCents: bookingPricing.fullNightlyRateCents,
+      subtotalCents:
+        fullRateQuantity * bookingPricing.fullNightlyRateCents,
+    },
+    {
+      label: `Dalla ${bookingPricing.fullRateNights + 1}a notte`,
+      quantity: reducedRateQuantity,
+      unitRateCents: bookingPricing.reducedNightlyRateCents,
+      subtotalCents:
+        reducedRateQuantity * bookingPricing.reducedNightlyRateCents,
+    },
+  ].filter((rate) => rate.quantity > 0);
 }
 
 export function isLatePickupTime(value: string | null | undefined) {
@@ -104,23 +131,24 @@ export function calculateBookingEstimate(params: {
     typeof params.expectedPickupTime === "string" &&
     params.expectedPickupTime.trim().length > 0;
   const isComplete = quantity >= 1 && dogCount > 0 && isPickupTimeComplete;
-  const overnightRateTier = getOvernightRateTier(Math.max(1, quantity));
-  const overnightUnitRateCents = overnightRateTier.amountCents;
+  const overnightRateBreakdown = getOvernightRateBreakdown(quantity);
+  const singleDogBaseCents = overnightRateBreakdown.reduce(
+    (total, rate) => total + rate.subtotalCents,
+    0,
+  );
 
   const baseBeforeSharedBoxDiscount = validDogs.reduce((total, dog) => {
     if (!dog) {
       return total;
     }
 
-    return total + overnightUnitRateCents * quantity;
+    return total + singleDogBaseCents;
   }, 0);
 
   const secondDogDiscountCents =
     dogCount >= 2
       ? Math.round(
-          (overnightUnitRateCents *
-            quantity *
-            bookingPricing.secondDogDiscountPercent) /
+          (singleDogBaseCents * bookingPricing.secondDogDiscountPercent) /
             100,
         )
       : 0;
@@ -163,8 +191,9 @@ export function calculateBookingEstimate(params: {
     stayType: "overnight",
     quantity,
     dogCount,
-    overnightUnitRateCents,
-    overnightRateLabel: overnightRateTier.label,
+    overnightUnitRateCents: bookingPricing.fullNightlyRateCents,
+    overnightRateLabel: `prime ${bookingPricing.fullRateNights} notti a ${formatEuro(bookingPricing.fullNightlyRateCents)}, successive a ${formatEuro(bookingPricing.reducedNightlyRateCents)}`,
+    overnightRateBreakdown,
     baseSubtotalCents,
     baseBeforeDiscountsCents: baseBeforeSharedBoxDiscount,
     secondDogDiscountCents,
