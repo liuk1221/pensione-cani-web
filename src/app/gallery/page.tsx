@@ -16,6 +16,9 @@ const galleryImages = [
   { src: "/asset/Interiors_1.jpg", alt: "Interno di un box con cuccia, ciotole e area coperta", title: "Spazi personali", description: "Zona coperta, cuccia e tutto il necessario per il soggiorno.", layout: "", aspect: "aspect-[4/5]", position: "object-center" },
   { src: "/asset/Struttura_1.jpg", alt: "Panoramica della pensione immersa nel verde", title: "Immersi nel verde", description: "Una struttura raccolta, tranquilla e circondata dalla natura.", layout: "sm:col-span-2", aspect: "aspect-[16/9]", position: "object-center" },
   { src: "/asset/Struttura_4.jpg", alt: "Aree esterne recintate della pensione", title: "Aree esterne protette", description: "Spazi recintati e organizzati per muoversi in sicurezza.", layout: "sm:col-span-2 lg:col-span-1", aspect: "aspect-[16/10] lg:aspect-[4/5]", position: "object-center" },
+  { src: "/asset/Struttura_Interna_1.jpeg", alt: "Box interno con cuccia, cuscino rosa e ciotole", title: "I box interni", description: "Cuccia e ciotole in uno spazio dedicato al riposo.", layout: "", aspect: "aspect-square", position: "object-center" },
+  { src: "/asset/Struttura_Interna_2.jpeg", alt: "Vista di un box interno con cuccia e porta in legno", title: "Un angolo accogliente", description: "Uno sguardo agli ambienti interni della pensione.", layout: "", aspect: "aspect-square", position: "object-center" },
+  { src: "/asset/Struttura_Interna_3.jpeg", alt: "Ingresso di un box interno con pareti chiare e porta aperta", title: "Dentro la struttura", description: "Gli ingressi e gli spazi dei box interni.", layout: "sm:col-span-2 lg:col-span-1", aspect: "aspect-square", position: "object-center" },
 ];
 
 export default function GalleryPage() {

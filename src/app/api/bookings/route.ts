@@ -31,6 +31,7 @@ type DogPayload = {
 };
 
 type PublicBookingBody = {
+  privacyPolicyAcknowledged?: unknown;
   startDate?: unknown;
   endDate?: unknown;
 
@@ -314,6 +315,13 @@ export async function POST(request: NextRequest) {
   }
 
   const body = parsedBody.value;
+
+  if (body.privacyPolicyAcknowledged !== true) {
+    return NextResponse.json(
+      { error: "Conferma di aver preso visione della privacy policy." },
+      { status: 400 },
+    );
+  }
 
   if (!isValidDateKey(body.startDate) || !isValidDateKey(body.endDate)) {
     return NextResponse.json({ error: "Date non valide." }, { status: 400 });

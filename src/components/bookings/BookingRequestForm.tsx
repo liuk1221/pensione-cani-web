@@ -127,12 +127,21 @@ export function BookingRequestForm({
     setSubmitError(null);
 
     const formData = new FormData(event.currentTarget);
+    const privacyPolicyAcknowledged = formData.get("privacyPolicyAcknowledged") === "on";
+
+    if (!privacyPolicyAcknowledged) {
+      setSubmitError("Conferma di aver preso visione della privacy policy.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const payloadDogs = dogs.map((dog) => readDogFromForm(formData, dog));
 
     const payload = {
       startDate,
       endDate,
       stayLabel,
+      privacyPolicyAcknowledged,
       ownerName: String(formData.get("ownerName") ?? ""),
       ownerSurname: String(formData.get("ownerSurname") ?? ""),
       email: String(formData.get("email") ?? ""),
@@ -451,6 +460,31 @@ export function BookingRequestForm({
       )}
 
       {estimate ? <EstimatePanel estimate={estimate} /> : null}
+
+      <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5">
+        <input
+          id="privacyPolicyAcknowledged"
+          name="privacyPolicyAcknowledged"
+          type="checkbox"
+          required
+          className="mt-1 h-5 w-5 shrink-0 accent-blue-700"
+        />
+        <label
+          htmlFor="privacyPolicyAcknowledged"
+          className="text-sm leading-6 text-slate-700"
+        >
+          Dichiaro di aver preso visione della{" "}
+          <a
+            href="/documents/privacy-policy-pirella-pet-resort.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900"
+          >
+            privacy policy
+          </a>
+          . <span className="font-semibold">(Obbligatorio)</span>
+        </label>
+      </div>
 
       <button
         type="submit"
